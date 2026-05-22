@@ -217,10 +217,11 @@ source .venv/bin/activate
 
 ## Estado de runbooks por repo
 
-El agente ingesta `docs/runbooks/` de 5 repos hermanos:
+El agente ingesta `docs/runbooks/` de 6 repos (incluido el propio):
 
 | Repo | docs/runbooks/ | Archivos |
 |---|---|---|
+| **ticket-agent** (propio) | ✅ | 5 MD |
 | ticket-ingestion-light | ✅ | 5 MD |
 | ticket-management | ✅ | 6 MD |
 | ticket-classification | ✅ | 8 MD |

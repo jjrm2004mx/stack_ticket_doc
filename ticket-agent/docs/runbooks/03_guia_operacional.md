@@ -55,7 +55,7 @@ python -m src.main ingest --source all
 PROVIDER=oci
 OCI_COMPARTMENT_ID=<compartment-id>
 OCI_SERVICE_ENDPOINT=https://inference.generativeai.us-chicago-1.oci.oraclecloud.com
-OCI_LLM_MODEL=meta.llama-3.3-70b-instruct
+OCI_MODEL=cohere.command-r-plus-08-2024
 ```
 
 Verificar que `~/.oci/config` exista con credenciales válidas.
@@ -74,6 +74,12 @@ El índice FAISS no cambia — solo cambia quién genera la respuesta.
 ---
 
 ## Queries de diagnóstico
+
+La salida incluye respuesta, fuentes, rol, confianza (0.0–1.0) y latencia:
+```
+Rol: usuario | Confianza: 0.8 | Latencia: 11.9s
+```
+Confianza < 0.5 activa el nodo `web_fetch` (placeholder en Fase 3 — no hace búsqueda real todavía).
 
 ```bash
 # Verificar las tres fuentes responden
