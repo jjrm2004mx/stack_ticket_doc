@@ -14,7 +14,7 @@ y los clasifica automáticamente para que lleguen al lugar correcto.
 |---|---|
 | La ventanilla que recibe correos | LangChain Agent — clasificador principal |
 | El catálogo de reglas de clasificación | LangGraph — el cerebro que decide |
-| El experto que lee y clasifica | Ollama (local) / OpenAI / Anthropic / Gemini |
+| El experto que lee y clasifica | Ollama (local) / OpenAI / Anthropic / Gemini / OCI GenAI |
 | El archivero que guarda las fichas | classifier-db — PostgreSQL de este repo |
 | El depósito de adjuntos originales | MinIO — almacena PDFs, Excel, imágenes |
 | La memoria rápida de correos frecuentes | classifier-redis — caché de respuestas LLM |
@@ -77,6 +77,7 @@ Todos los servicios siguientes viven en el `docker-compose.yml` de este repo:
 | OpenAI | `gpt-4o-mini` | Cloud | `OPENAI_API_KEY` en `.env` |
 | Anthropic | `claude-3-5-haiku-20241022` | Cloud | `ANTHROPIC_API_KEY` en `.env` |
 | Gemini | `gemini-1.5-flash` | Cloud | `GEMINI_API_KEY` en `.env` |
+| OCI GenAI | `cohere.command-r-plus-08-2024` | Cloud Oracle | `OCI_COMPARTMENT_ID` + `~/.oci/config` |
 
 El provider activo se controla con `AGENT_PROVIDER` en el `.env`.
 Se puede cambiar por request sin reiniciar el stack.
@@ -214,7 +215,8 @@ LangChain Agent  →  langchain-api:8000/ask  →  Provider elegido
                                                  ├── Ollama (local)
                                                  ├── OpenAI
                                                  ├── Anthropic
-                                                 └── Gemini
+                                                 ├── Gemini
+                                                 └── OCI GenAI
 ```
 
 **Caché Redis en la API:** cada llamada a `/ask` genera una clave

@@ -317,7 +317,7 @@ curl -s -X POST http://localhost:8001/process \
     "provider": "anthropic"
   }' | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])"
 
-# Providers disponibles: ollama | openai | anthropic | gemini
+# Providers disponibles: ollama | openai | anthropic | gemini | oci
 ```
 
 ### Por defecto permanente
@@ -351,6 +351,37 @@ curl -s -X POST http://localhost:8000/ask \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Responde solo: ok", "provider": "anthropic"}' \
   | python3 -m json.tool
+
+# Probar OCI GenAI
+curl -s -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Responde solo: ok", "provider": "oci"}' \
+  | python3 -m json.tool
+```
+
+### Requisitos previos para OCI GenAI
+
+OCI usa autenticación por API Key local — no requiere variable de entorno con el secreto,
+sino un archivo de configuración en el host:
+
+```bash
+# Verificar que ~/.oci/config existe y tiene el perfil [DEFAULT]
+cat ~/.oci/config
+# Debe mostrar: [DEFAULT], user, fingerprint, tenancy, region, key_file
+
+# El archivo se monta automáticamente como volumen en langchain-api (solo lectura)
+# Configurado en docker-compose.yml: ${HOME}/.oci:/root/.oci:ro
+```
+
+Variables relevantes en `.env`:
+
+```ini
+AGENT_PROVIDER=oci
+OCI_MODEL=cohere.command-r-plus-08-2024
+OCI_SERVICE_ENDPOINT=https://inference.generativeai.us-chicago-1.oci.oraclecloud.com
+OCI_COMPARTMENT_ID=ocid1.compartment.oc1..tu_ocid_real
+OCI_TEMPERATURE=0
+OCI_MAX_TOKENS=1400
 ```
 
 ---

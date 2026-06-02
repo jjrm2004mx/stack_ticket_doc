@@ -169,13 +169,17 @@ RETRIEVAL_K=3
 
 ---
 
-## Próximo paso — Containerización
+## Arranque en contenedor (modo producción)
 
-Cuando la API esté validada, se empaqueta como contenedor Podman:
+La API corre dentro del contenedor `ticket-agent`. El `entrypoint.sh` ejecuta uvicorn
+directamente — no usar el comando uvicorn manual en producción.
 
+```bash
+# Levantar el contenedor (recomendado)
+bash ~/stack_ticket/ticket-agent/startup.sh up
+
+# Health check
+curl http://localhost:8002/api/v1/health
 ```
-Dockerfile         → python:3.11-slim + requirements.txt + uvicorn
-podman-compose.yml → puerto 8002, red ticket-management-network, volumen faiss_data
-```
 
-Ver `TAREAS.md` sección Fase 4 → Containerización.
+Ver [06 — Deploy Contenedor](06_deploy_contenedor.md) para el detalle completo.

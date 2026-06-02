@@ -1,7 +1,7 @@
 # TAREAS — ticket-agent
 
 Control de actividades por fase. Marcar `[x]` al completar cada tarea.
-Última actualización: 2026-05-29 (Fase 4 — Docling + V3 Oracle + routing + /diagnose; siguiente: JSON mode structured output)
+Última actualización: 2026-06-01 (KB_RUNBOOKS routing completado + re-ingesta 1,638 chunks + verificación confianza 0.8)
 
 ---
 
@@ -25,7 +25,7 @@ Control de actividades por fase. Marcar `[x]` al completar cada tarea.
 | REST API | ✅ | FastAPI puerto 8002 — `/query`, `/health`, `/info`, `/diagnose` |
 | Containerización | ✅ | Dockerfile + podman-compose + ticket-management-network |
 | Docling — loader multi-formato | ✅ | `docling_loader.py` — PDF/DOCX/PPTX/YAML/URLs · lazy import |
-| Routing multi-tabla | ✅ | `_TIPO_TO_TABLE` en `OracleVSAdapter` · soporte: RRF 3 tablas |
+| Routing multi-tabla | ✅ | `_TIPO_TO_TABLE` en `OracleVSAdapter` · soporte: RRF 4 tablas (KB_CHUNKS + KB_MANUALS + KB_INCIDENTS + KB_RUNBOOKS) |
 | Error Event + `/diagnose` | ✅ | `ErrorEventRequest` · `DiagnosisResponse` · `POST /api/v1/diagnose` |
 
 ### Gaps respecto a la arquitectura objetivo
@@ -34,7 +34,8 @@ Control de actividades por fase. Marcar `[x]` al completar cada tarea.
 |---|---|---|
 | **KB_ERROR_CATALOG poblada** | La tabla existe (V3) pero no hay pipeline de ingesta para errores conocidos. Sin datos, `lookup_catalog` siempre pasa vacío. | Calidad del Diagnostic Agent |
 | **KB_MANUALS / KB_INCIDENTS pobladas** | Tablas creadas; requieren documentos PDF/DOCX reales via `--source manuales/incidentes`. | Retrieval multi-tabla efectivo |
-| **KB_RUNBOOKS sin routing** | Los runbooks van a KB_CHUNKS (`tipo='runbooks'`) en lugar de KB_RUNBOOKS. KB_RUNBOOKS existe (V3) pero nunca recibe datos ni está en `_SOPORTE_TABLES`. El agente no responde bien preguntas operacionales sobre re-ingesta y operación del propio stack. | Retrieval operacional rol soporte |
+| ~~**KB_RUNBOOKS sin routing**~~ | ✅ Resuelto 2026-06-01 — runbooks → KB_RUNBOOKS, 4 tablas en `_SOPORTE_TABLES`, re-ingesta 1,352 chunks. Query "¿cómo actualizo la ingesta?" → confianza 0.8. | — |
+| **Web URLs en Docling** | `load_from_paths()` no detecta URLs — usa `Path.exists()` y falla silenciosamente. `load_url()` existe pero no se invoca desde el pipeline CSV. Fix: detectar `http` antes de crear `Path`. | Ingesta desde wikis, docs online |
 | **CORSMiddleware** | Orígenes permitidos hardcodeados o ausentes. Baja urgencia: APIs backend-to-backend. | — |
 | **Contenedores sin root** | Dockerfiles sin usuario `appuser`. Riesgo mitigado por Podman rootless. | — |
 
@@ -416,7 +417,7 @@ DESPUÉS      → Fase 4 Mermaid → Property Graph (requiere Oracle operativo)
       `_TIPO_TO_TABLE`: manuales→KB_MANUALS, incidentes→KB_INCIDENTS, resto→KB_CHUNKS
       `add_chunks()`: agrupa por tipo y hace DELETE+INSERT en la tabla correspondiente
       `_do_insert()`: SQL específico por tabla (KB_CHUNKS con TIPO/PANTALLA; KB_MANUALS con DOC_FORMAT; KB_INCIDENTS)
-      `retrieve()` soporte: multi-tabla RRF Python — KB_CHUNKS + KB_MANUALS + KB_INCIDENTS
+      `retrieve()` soporte: multi-tabla RRF Python — KB_CHUNKS + KB_MANUALS + KB_INCIDENTS + KB_RUNBOOKS (2026-06-01)
       `_vec_search()`: helper de búsqueda vectorial por tabla con parent expansion
       `load()`: cuenta chunks en todas las tablas activas (_SOPORTE_TABLES)
       BM25 (_bm25_rank): opera sobre KB_CHUNKS — chunks especializados contribuyen via path vectorial
@@ -431,39 +432,24 @@ DESPUÉS      → Fase 4 Mermaid → Property Graph (requiere Oracle operativo)
 
 ---
 
-## PENDIENTE — Routing KB_RUNBOOKS (rama: feature/kb-runbooks-routing)
+## ✅ COMPLETADO — Routing KB_RUNBOOKS (2026-06-01, rama: feature/kb-runbooks-routing)
 
-**Problema:** los runbooks operacionales van a KB_CHUNKS mezclados con docs de usuario.
-KB_RUNBOOKS existe (V3, aplicado 2026-05-29) pero nunca recibe datos.
-El agente no puede responder preguntas como "¿cómo actualizo la ingesta?" con confianza suficiente.
+**Problema resuelto:** los runbooks operacionales iban a KB_CHUNKS mezclados con docs de usuario.
+El agente respondía con confianza 0.0 a preguntas sobre re-ingesta y operación del stack.
 
-**Evidencia:** query `"¿Cambié la documentación, cómo actualizo la ingesta?"` con `rol=soporte`
+**Evidencia antes:** query `"¿Cambié la documentación, cómo actualizo la ingesta?"` con `rol=soporte`
 → `"Lo siento, no tengo información disponible sobre este procedimiento"` (confianza 0.0).
 
-**Solución — 4 cambios en `src/vector_store/oracle_store.py`:**
+**Evidencia después:** misma query → respuesta con fuente `03_guia_operacional.md` (confianza 0.8).
 
-- [ ] `_TIPO_TO_TABLE`: cambiar `"runbooks": "KB_CHUNKS"` → `"runbooks": "KB_RUNBOOKS"`
-- [ ] `_SOPORTE_TABLES`: agregar `"KB_RUNBOOKS"` a la lista
-- [ ] `_do_insert()`: agregar branch `elif table == "KB_RUNBOOKS"` con SERVICE (derivado del path) y RUNBOOK_TYPE (derivado del nombre de archivo)
-- [ ] `_vec_search()`: agregar branch `elif table == "KB_RUNBOOKS"` con query vectorial + parent expansion
-- [ ] Re-ingestar: `python -m src.main ingest --source runbooks`
-- [ ] Verificar: query `"¿cómo actualizo la ingesta?"` con `rol=soporte` → respuesta con fuente `03_guia_operacional.md`
+**Cambios implementados en `src/vector_store/oracle_store.py`:**
 
-**Derivación SERVICE desde path:**
-```
-../ticket-agent/docs/runbooks/  → ticket-agent
-../ticket-management/docs/runbooks/ → ticket-management
-../notification-service/docs/runbooks/ → notification-service
-./docs/runbooks/ → ticket-agent (fallback)
-```
-
-**Derivación RUNBOOK_TYPE desde nombre de archivo:**
-```
-06_deploy* → deployment
-03_guia*   → maintenance
-00_*       → config
-resto      → troubleshooting
-```
+- [x] `_TIPO_TO_TABLE`: `"runbooks": "KB_CHUNKS"` → `"runbooks": "KB_RUNBOOKS"`
+- [x] `_SOPORTE_TABLES`: agregado `"KB_RUNBOOKS"` — ahora 4 tablas en retrieval soporte
+- [x] `_do_insert()`: branch `elif table == "KB_RUNBOOKS"` con `_service_from_path()` y `_runbook_type_from_path()`
+- [x] `_vec_search()`: branch `elif table == "KB_RUNBOOKS"` con query vectorial + parent expansion
+- [x] Re-ingesta: `python -m src.main ingest --source all` → 286 KB_CHUNKS + 1,352 KB_RUNBOOKS
+- [x] Verificación: confianza 0.8 confirmada con fuente `docs/runbooks/03_guia_operacional.md`
 
 **Nota:** BM25 (`_bm25_rank`) sigue operando sobre KB_CHUNKS — KB_RUNBOOKS contribuye
 al score final via el path vectorial, mismo patrón que KB_MANUALS e KB_INCIDENTS.
@@ -563,6 +549,14 @@ Si el volumen de jobs crece o Redis se convierte en SPOF, escalar a instancia de
       `ContextVar` en `src/utils/request_id.py` — aislado por async task, sin colisión entre requests concurrentes
       `_RequestIdFilter` en `src/utils/logger.py` — agrega `request_id` a cada línea JSON automáticamente
       Header devuelto en la respuesta HTTP — cliente puede correlacionar errores con logs de Loki
+- [ ] **Web URLs en Docling** — agregar detección de `http` en `load_from_paths()` antes de crear `Path`:
+      ```python
+      if path_str.startswith("http"):
+          doc = load_url(path_str, rol=rol, tipo=tipo)
+          if doc: docs.append(doc)
+          continue
+      ```
+      Después activar con `SOURCE_MANUALES=https://...` en `.env` y correr `--source manuales`.
 - [ ] **CORSMiddleware** — configurar orígenes permitidos explícitamente. Baja urgencia: los servicios Python son APIs backend-to-backend, no las consume el browser directamente.
 - [ ] **Contenedores sin root** — crear usuario `appuser` no privilegiado en los Dockerfiles. En Podman rootless el riesgo está mitigado, pero es buena práctica para migración futura a Docker o servidor compartido.
 

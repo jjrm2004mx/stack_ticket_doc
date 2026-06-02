@@ -1,0 +1,132 @@
+flowchart TD
+    %% Ecosistema ticket-sys — Mapa de servicios y dependencias
+    %% Fuente canónica para el Property Graph de Oracle 23ai (ticket-agent Fase 4)
+    %%
+    %% Convenciones de aristas:
+    %%   -->|"CALLS"|      HTTP request saliente
+    %%   -->|"STORES_IN"|  escritura en base de datos / almacenamiento
+    %%   -->|"READS"|      lectura de datos (data source)
+    %%   -->|"SCRAPES"|    polling de métricas Prometheus
+    %%   -->|"PUSHES_TO"|  envío de logs/eventos (push)
+    %%   -->|"TRIGGERS"|   dispara flujo externo (webhook / OAuth)
+    %%
+    %% Formato de nodos:
+    %%   ID["ID\ntipo:SERVICE|STORAGE|EXTERNAL\npuerto:XXXX\nDescripción"]
+    %%   El ID del nodo es igual al primer campo de la etiqueta (facilita el parser)
+
+    %% ----------------------------------------------------------------
+    %% Externo
+    %% ----------------------------------------------------------------
+    subgraph EXT["Externo"]
+        gmail["gmail\ntipo:EXTERNAL\nGmail API"]
+        oci_genai["oci_genai\ntipo:EXTERNAL\nOCI GenAI — cohere.command-r-plus-08-2024"]
+    end
+
+    %% ----------------------------------------------------------------
+    %% ticket-ingestion-light
+    %% ----------------------------------------------------------------
+    subgraph INGESTION["ticket-ingestion-light"]
+        til_n8n["til_n8n\ntipo:SERVICE\npuerto:5679\nn8n automation engine"]
+        n8n_sqlite[("n8n_sqlite\ntipo:STORAGE\nSQLite — volumen n8n_data")]
+    end
+
+    %% ----------------------------------------------------------------
+    %% ticket-classification
+    %% ----------------------------------------------------------------
+    subgraph CLASSIFICATION["ticket-classification"]
+        langchain_agent["langchain_agent\ntipo:SERVICE\npuerto:8001\nFastAPI + LangGraph — clasificación de tickets"]
+        langchain_api["langchain_api\ntipo:SERVICE\npuerto:8000\nFastAPI — gateway LLM intercambiable"]
+        ollama["ollama\ntipo:SERVICE\npuerto:11434\nOllama — llama3.2:3b (CPU local)"]
+        classifier_db[("classifier_db\ntipo:STORAGE\nPostgreSQL :5434 — classifier_db")]
+        classifier_redis[("classifier_redis\ntipo:STORAGE\nRedis :6381 — caché LLM + estado agente")]
+        classifier_minio[("classifier_minio\ntipo:STORAGE\nMinIO :9000 — bucket: email-attachments")]
+    end
+
+    %% ----------------------------------------------------------------
+    %% ticket-management
+    %% ----------------------------------------------------------------
+    subgraph MANAGEMENT["ticket-management"]
+        ticket_frontend["ticket_frontend\ntipo:SERVICE\npuerto:8090\nNginx + Vite React — portal web"]
+        ticket_backend["ticket_backend\ntipo:SERVICE\npuerto:8080\nSpring Boot REST API"]
+        ticket_db[("ticket_db\ntipo:STORAGE\nPostgreSQL :5433 — tickets_db")]
+        ticket_redis[("ticket_redis\ntipo:STORAGE\nRedis :6380 — caché + sesiones")]
+        ticket_minio[("ticket_minio\ntipo:STORAGE\nMinIO :9002 — bucket: ticket-attachments")]
+    end
+
+    %% ----------------------------------------------------------------
+    %% notification-service
+    %% ----------------------------------------------------------------
+    subgraph NOTIFICATION["notification-service"]
+        notification_svc["notification_svc\ntipo:SERVICE\npuerto:8081\nSpring Boot — envío de notificaciones"]
+        notification_db[("notification_db\ntipo:STORAGE\nPostgreSQL :5435 — notifications_db")]
+    end
+
+    %% ----------------------------------------------------------------
+    %% ticket-agent
+    %% ----------------------------------------------------------------
+    subgraph AGENT["ticket-agent"]
+        ticket_agent["ticket_agent\ntipo:SERVICE\npuerto:8002\nFastAPI + RAG + LangGraph"]
+        faiss_index[("faiss_index\ntipo:STORAGE\nFAISS local — vector_db/faiss_index/")]
+        oracle_adb[("oracle_adb\ntipo:STORAGE\nOracle 23ai OCI — KB_CHUNKS vectorial")]
+    end
+
+    %% ----------------------------------------------------------------
+    %% infra-monitoring
+    %% ----------------------------------------------------------------
+    subgraph OBSERVABILITY["infra-monitoring"]
+        prometheus["prometheus\ntipo:SERVICE\npuerto:9090\nPrometheus — scraping de métricas"]
+        grafana["grafana\ntipo:SERVICE\npuerto:3000\nGrafana — dashboards"]
+        loki["loki\ntipo:SERVICE\npuerto:3100\nLoki — agregación de logs"]
+        promtail["promtail\ntipo:SERVICE\nPromtail — recolector journald → Loki"]
+        node_exporter["node_exporter\ntipo:SERVICE\npuerto:9100\nNode Exporter — métricas del host"]
+    end
+
+    %% ----------------------------------------------------------------
+    %% Aristas — flujo de ingesta de correos
+    %% ----------------------------------------------------------------
+    gmail               -->|"TRIGGERS"| til_n8n
+    til_n8n             -->|"STORES_IN"| n8n_sqlite
+    til_n8n             -->|"CALLS"| langchain_agent
+    langchain_agent     -->|"CALLS"| langchain_api
+    langchain_agent     -->|"CALLS"| ticket_backend
+    langchain_agent     -->|"STORES_IN"| classifier_db
+    langchain_agent     -->|"STORES_IN"| classifier_redis
+    langchain_agent     -->|"STORES_IN"| classifier_minio
+    langchain_api       -->|"CALLS"| ollama
+    langchain_api       -->|"STORES_IN"| classifier_redis
+
+    %% ----------------------------------------------------------------
+    %% Aristas — ticket-management
+    %% ----------------------------------------------------------------
+    ticket_frontend     -->|"CALLS"| ticket_backend
+    ticket_backend      -->|"CALLS"| langchain_agent
+    ticket_backend      -->|"CALLS"| notification_svc
+    ticket_backend      -->|"STORES_IN"| ticket_db
+    ticket_backend      -->|"STORES_IN"| ticket_redis
+    ticket_backend      -->|"STORES_IN"| ticket_minio
+
+    %% ----------------------------------------------------------------
+    %% Aristas — notification-service
+    %% ----------------------------------------------------------------
+    notification_svc    -->|"CALLS"| til_n8n
+    notification_svc    -->|"STORES_IN"| notification_db
+    notification_svc    -->|"STORES_IN"| ticket_redis
+
+    %% ----------------------------------------------------------------
+    %% Aristas — ticket-agent
+    %% ----------------------------------------------------------------
+    ticket_agent        -->|"CALLS"| ollama
+    ticket_agent        -->|"CALLS"| oci_genai
+    ticket_agent        -->|"STORES_IN"| faiss_index
+    ticket_agent        -->|"STORES_IN"| oracle_adb
+
+    %% ----------------------------------------------------------------
+    %% Aristas — observabilidad
+    %% ----------------------------------------------------------------
+    prometheus          -->|"SCRAPES"| ticket_backend
+    prometheus          -->|"SCRAPES"| langchain_agent
+    prometheus          -->|"SCRAPES"| ticket_agent
+    prometheus          -->|"SCRAPES"| node_exporter
+    promtail            -->|"PUSHES_TO"| loki
+    grafana             -->|"READS"| prometheus
+    grafana             -->|"READS"| loki
