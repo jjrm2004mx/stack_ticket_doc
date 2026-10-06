@@ -368,9 +368,11 @@ sino un archivo de configuración en el host:
 # Verificar que ~/.oci/config existe y tiene el perfil [DEFAULT]
 cat ~/.oci/config
 # Debe mostrar: [DEFAULT], user, fingerprint, tenancy, region, key_file
+# key_file debe ser ~/.oci/oci_api_key.pem (no /home/<usuario>/...): se lee en host y contenedor
 
 # El archivo se monta automáticamente como volumen en langchain-api (solo lectura)
-# Configurado en docker-compose.yml: ${HOME}/.oci:/root/.oci:ro
+# Configurado en docker-compose.yml: ${HOME}/.oci:/root/.oci:ro,Z
+# (Z es obligatorio con SELinux Enforcing en Rocky; ver 08_switch_to_oci_genai.md)
 ```
 
 Variables relevantes en `.env`:
