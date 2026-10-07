@@ -371,15 +371,15 @@ cat ~/.oci/config
 # key_file debe ser ~/.oci/oci_api_key.pem (no /home/<usuario>/...): se lee en host y contenedor
 
 # El archivo se monta automáticamente como volumen en langchain-api (solo lectura)
-# Configurado en docker-compose.yml: ${HOME}/.oci:/root/.oci:ro,Z
-# (Z es obligatorio con SELinux Enforcing en Rocky; ver 08_switch_to_oci_genai.md)
+# Configurado en docker-compose.yml: ${HOME}/.oci:/root/.oci:ro,z
+# (z es obligatorio con SELinux Enforcing en Rocky; ver 08_switch_to_oci_genai.md)
 ```
 
 Variables relevantes en `.env`:
 
 ```ini
 AGENT_PROVIDER=oci
-OCI_MODEL=cohere.command-r-plus-08-2024
+OCI_MODEL=openai.gpt-oss-20b
 OCI_SERVICE_ENDPOINT=https://inference.generativeai.us-chicago-1.oci.oraclecloud.com
 OCI_COMPARTMENT_ID=ocid1.compartment.oc1..tu_ocid_real
 OCI_TEMPERATURE=0
