@@ -7,7 +7,7 @@ fuente: ticket-management
 
 # Configuración del sistema — Admin
 
-Este documento cubre todas las tareas de configuración que solo el Admin puede realizar: usuarios, clasificaciones, workflow y permisos.
+Este documento cubre todas las tareas de configuración que solo el Admin puede realizar: usuarios, áreas y categorías, workflow y permisos.
 
 ---
 
@@ -49,12 +49,14 @@ Cuando un usuario deja de tener acceso (por ejemplo, un empleado que se va de la
 
 ---
 
-## 2. Gestión de clasificaciones
+## 2. Gestión de áreas y categorías
 
-**Pantalla:** Gestión de Clasificaciones (`screen: classificationManagement`)
-**Permiso requerido:** MANAGE_CLASSIFICATIONS
+**Pantalla:** 🏷️ Áreas y categorías (`screen: classificationManagement`)
+**Permiso requerido:** MANAGE_CLASSIFICATIONS ("Gestionar áreas y categorías")
 
-### Clasificaciones del sistema (por defecto)
+El catálogo tiene dos niveles: el **área** (por ejemplo, IT) y la **categoría** dentro de ella (por ejemplo, impresora). El clasificador automático de correos asigna cada ticket a un área y una categoría de este catálogo.
+
+### Áreas del sistema (por defecto)
 
 | Nombre | Color | Descripción |
 |---|---|---|
@@ -63,7 +65,7 @@ Cuando un usuario deja de tener acceso (por ejemplo, un empleado que se va de la
 | operaciones | #009900 | Procesos y logística |
 | otro | #999999 | Sin clasificación específica |
 
-### Categorías por clasificación
+### Categorías por área
 
 **IT:** hardware, software, red, acceso, correo, impresora, vpn, servidor, base_de_datos, seguridad
 
@@ -73,22 +75,34 @@ Cuando un usuario deja de tener acceso (por ejemplo, un empleado que se va de la
 
 **otro:** general, sin_clasificar
 
-### Agregar una clasificación nueva
-1. Haz clic en **"Nueva Clasificación"**
-2. Define: nombre, color (formato hex ej. #FF0000), descripción
-3. Guarda
-4. La nueva clasificación aparece de inmediato en el selector de tickets y en el sistema de clasificación automática
+### Agregar un área nueva
+1. Haz clic en **"+ Nueva área"**
+2. Define: nombre, descripción y color
+3. Presiona **"Crear"**
+4. El área aparece de inmediato en los formularios de tickets y en el catálogo que consulta el clasificador
 
-### Agregar una categoría a una clasificación existente
-1. Selecciona la clasificación
-2. Haz clic en **"Agregar Categoría"**
-3. Define el nombre (sin espacios, en minúsculas, usar guion bajo si es compuesto)
-4. Guarda
+No puede haber dos áreas con el mismo nombre, aunque solo cambien las mayúsculas ("IT" e "it" son el mismo nombre).
 
-### Editar una clasificación o categoría existente
-- Cambiar el nombre de una clasificación afecta todos los tickets que ya la tienen asignada
-- Cambiar el color solo afecta la visualización, no los datos
-- Eliminar una clasificación podría afectar tickets existentes — el sistema puede no permitirlo si hay tickets activos con esa clasificación
+### Agregar una categoría a un área
+1. Despliega el área con la flecha ▶
+2. Escribe el nombre en **"Nueva categoría..."** (recomendado: minúsculas y guion bajo si es compuesto)
+3. Presiona **"+ Agregar"** o Enter
+
+Dentro de un área tampoco puede haber dos categorías con el mismo nombre ignorando mayúsculas.
+
+### Editar un área o una categoría
+- **Área:** haz clic en ✏️ para cambiar nombre, descripción o color y presiona **"Guardar"**. El nuevo nombre se ve en todos los tickets que ya la tienen
+- **Categoría:** haz clic en ✏️ dentro del chip, escribe el nuevo nombre y presiona Enter (Escape cancela)
+- El color del área se muestra como un punto en las tarjetas del tablero, en la lista y en el detalle del ticket
+
+### Desactivar un área o una categoría
+- Usa el interruptor del área o el punto de color de la categoría. El sistema pide confirmación antes de desactivar
+- Un área o categoría inactiva deja de ofrecerse al crear, revisar o corregir tickets, y los correos que el clasificador le asigne llegan como borradores a la Bandeja de revisión
+- Los tickets existentes conservan su área y categoría
+- Nada se puede eliminar: solo desactivar y volver a activar
+
+### Exportar la revisión del clasificador
+**"⬇ Exportar revisión del clasificador"** descarga un CSV con cada ticket que llegó por correo en el período elegido: el área y la categoría que propuso el clasificador, su confianza y el área y la categoría finales que dejó una persona. Sirve para medir cuánto acierta el clasificador y ajustarlo.
 
 ---
 
@@ -190,5 +204,5 @@ Además de aprobar borradores (igual que Manager), Admin puede **eliminarlos**.
 2. **Cambios de permisos:** documenta por qué cambiaste un permiso — usa los comentarios del sistema si están disponibles
 3. **Desactivación de usuarios:** reasigna tickets antes de desactivar
 4. **Eliminación de borradores:** revisa el contenido antes de eliminar — puede ser una solicitud legítima mal formateada
-5. **Clasificaciones:** antes de agregar una nueva, verifica que no existe una similar con otro nombre
+5. **Áreas y categorías:** antes de agregar una nueva, verifica que no existe una similar con otro nombre
 6. **Múltiples Admins:** es recomendable tener al menos dos Admins para evitar puntos únicos de falla en la administración

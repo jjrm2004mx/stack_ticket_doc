@@ -82,7 +82,7 @@ Los borradores son tickets con campo `status` nulo en la base de datos. No son u
 
 **Como Admin puedes:**
 - Ver todos los borradores en la sección de Revisión de Borradores
-- Editar cualquier campo del borrador: prioridad, clasificación, categoría, asignado a
+- Editar cualquier campo del borrador: prioridad, área, categoría, asignado a
 - **Aprobar** → activa el borrador como ticket ABIERTO
 - **Eliminar** → borra permanentemente el borrador (exclusivo de Admin)
 

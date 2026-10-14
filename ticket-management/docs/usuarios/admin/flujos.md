@@ -7,7 +7,7 @@ fuente: ticket-management
 
 # Flujos principales — Admin
 
-El Admin tiene acceso completo a todas las funciones del sistema: gestión de tickets, usuarios, clasificaciones, workflow y permisos. Este documento cubre todas las operaciones disponibles.
+El Admin tiene acceso completo a todas las funciones del sistema: gestión de tickets, usuarios, áreas y categorías, workflow y permisos. Este documento cubre todas las operaciones disponibles.
 
 ---
 
@@ -65,36 +65,35 @@ Si un usuario ya no debe tener acceso al sistema, desactívalo (no lo elimines �
 
 ---
 
-## 3. Gestionar clasificaciones (MANAGE_CLASSIFICATIONS)
+## 3. Gestionar áreas y categorías (MANAGE_CLASSIFICATIONS)
 
-Las clasificaciones y categorías determinan cómo se organiza el conocimiento de los tickets.
+Las áreas y sus categorías organizan los tickets; el clasificador automático asigna cada correo a un área y una categoría de este catálogo.
 
-**Cómo acceder:** menú principal → **"Gestión de Clasificaciones"**
+**Cómo acceder:** encabezado → **"🏷️ Áreas y categorías"**
 
-### Clasificaciones disponibles por defecto:
+### Áreas disponibles por defecto:
 - `IT` — tecnología e infraestructura (color #0066FF)
 - `cliente` — atención al cliente (color #FF6600)
 - `operaciones` — procesos y logística (color #009900)
 - `otro` — sin clasificación específica (color #999999)
 
-### Categorías por clasificación:
+### Categorías por área:
 - **IT:** hardware, software, red, acceso, correo, impresora, vpn, servidor, base_de_datos, seguridad
 - **cliente:** facturacion, reclamo, consulta, devolucion, garantia, soporte, pedido, envio
 - **operaciones:** logistica, compras, inventario, mantenimiento, produccion, calidad, proveedores
 - **otro:** general, sin_clasificar
 
-### Agregar una clasificación nueva
-1. Haz clic en **"Nueva Clasificación"**
-2. Define: nombre, color (hex), descripción
-3. Guarda
+### Agregar un área nueva
+1. Haz clic en **"+ Nueva área"**
+2. Define: nombre, descripción y color
+3. Presiona **"Crear"**
 
-### Agregar una categoría a una clasificación
-1. Selecciona la clasificación
-2. Haz clic en **"Agregar Categoría"**
-3. Define el nombre de la categoría
-4. Guarda
+### Agregar una categoría a un área
+1. Despliega el área con la flecha ▶
+2. Escribe el nombre en **"Nueva categoría..."**
+3. Presiona **"+ Agregar"** o Enter
 
-**Impacto:** las nuevas clasificaciones y categorías quedan disponibles de inmediato para asignar a tickets y para el sistema de clasificación automática (IA).
+**Impacto:** las nuevas áreas y categorías quedan disponibles de inmediato para asignar a tickets y en el catálogo que consulta el clasificador automático. Los nombres no se pueden repetir aunque cambien las mayúsculas. Nada se elimina: un área o categoría se desactiva y sus correos llegan como borradores a la Bandeja de revisión. El detalle completo está en `configuracion.md`.
 
 ---
 
@@ -210,7 +209,7 @@ A diferencia de Manager (que solo puede aprobar), Admin puede eliminar borradore
 | ABIERTO → CERRADO directamente | Cerrar sin pasar por EN PROGRESO ni EN REVISIÓN |
 | ARCHIVE_TICKET | Archivar cualquier ticket |
 | MANAGE_USERS | Crear, editar y desactivar usuarios |
-| MANAGE_CLASSIFICATIONS | Gestionar clasificaciones y categorías |
+| MANAGE_CLASSIFICATIONS | Gestionar áreas y categorías y exportar la revisión del clasificador |
 | MANAGE_WORKFLOW | Configurar estados y transiciones del sistema |
 | Eliminar borradores | Los Managers solo pueden aprobar |
 | Actualizar matriz de permisos | Cambiar qué puede hacer cada rol |

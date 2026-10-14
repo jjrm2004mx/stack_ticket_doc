@@ -1,7 +1,7 @@
 # TAREAS — ticket-management
 
 Control de actividades por fase. Marcar `[x]` al completar cada tarea.
-Última actualización: 2026-05-29
+Última actualización: 2026-06-05
 
 ---
 
@@ -10,7 +10,7 @@ Control de actividades por fase. Marcar `[x]` al completar cada tarea.
 **Objetivo:** Exponer las capacidades de ticket-agent al frontend de ticket-management
 según el rol del usuario autenticado.
 
-**Estado:** En progreso — rama `feature/agent-integration`
+**Estado:** Backend completo. Frontend: widget RAG listo, falta consola de diagnóstico.
 
 ### Contexto
 
@@ -24,14 +24,14 @@ según el rol del usuario autenticado.
 
 #### DTOs (`infrastructure/web/dto/`)
 
-- [ ] Crear `AgentQueryRequest.java` — record `{ String query }`
-- [ ] Crear `AgentQueryResponse.java` — record `{ String respuesta, List<String> fuentes, List<String> pantallas, String rol, double confianza, long latenciaMs }`
-- [ ] Crear `DiagnoseRequest.java` — record `{ String errorCode, String service, String severity, String message, String stackTrace }`
-- [ ] Crear `DiagnoseResponse.java` — record `{ String causa, String remediacion, String runbook, List<String> fuentes, double confianza, long latenciaMs, String servicio, String severidad }`
+- [x] Crear `AgentQueryRequest.java` — record `{ String query }`
+- [x] Crear `AgentQueryResponse.java` — record `{ String respuesta, List<String> fuentes, List<String> pantallas, String rol, double confianza, long latenciaMs }`
+- [x] Crear `DiagnoseRequest.java` — record `{ String errorCode, String service, String severity, String message, String stackTrace }`
+- [x] Crear `DiagnoseResponse.java` — record `{ String causa, String remediacion, String runbook, List<String> fuentes, double confianza, long latenciaMs, String servicio, String severidad }`
 
 #### Cliente HTTP (`infrastructure/agent/`)
 
-- [ ] Crear `AgentClient.java` — `@Component` con `RestTemplate`
+- [x] Crear `AgentClient.java` — `@Component` con `RestTemplate`
   - `queryAgent(String query, String rol) → AgentQueryResponse`
   - `diagnoseTicket(DiagnoseRequest req) → DiagnoseResponse`
   - Timeout: 30s (llamadas LLM pueden tardar hasta 12s)
@@ -39,13 +39,13 @@ según el rol del usuario autenticado.
 
 #### Configuración
 
-- [ ] Agregar `@Bean RestTemplate` en clase de configuración existente
-- [ ] Agregar `agent.base-url=http://ticket-agent:8002` en `application.properties`
-- [ ] Agregar `AGENT_BASE_URL` como variable de entorno en `docker-compose.yml`
+- [x] Agregar `@Bean RestTemplate` en clase de configuración existente
+- [x] Agregar `agent.base-url=http://ticket-agent:8002` en `application.properties`
+- [x] Agregar `AGENT_BASE_URL` como variable de entorno en `docker-compose.yml`
 
 #### Controller (`infrastructure/web/controller/`)
 
-- [ ] Crear `AgentController.java`
+- [x] Crear `AgentController.java`
   - `POST /api/v1/agent/query` — todos los roles autenticados
     - Toma `query` del body, `rol` del `request.getAttribute("role")`
     - Delega a `AgentClient.queryAgent()`
@@ -55,20 +55,20 @@ según el rol del usuario autenticado.
 
 #### Excepción
 
-- [ ] Crear `AgentUnavailableException.java` en `shared/exception/`
-- [ ] Registrar handler en `GlobalExceptionHandler` → 503 con mensaje estándar
+- [x] Crear `AgentUnavailableException.java` en `shared/exception/`
+- [x] Registrar handler en `GlobalExceptionHandler` → 503 con mensaje estándar
 
 ### Frontend — ticket-management
 
 #### Widget flotante (todos los roles)
 
-- [ ] Crear componente widget RAG (`agent-widget.js` o equivalente en el stack frontend)
+- [x] Crear componente widget RAG (`AgentWidget.tsx`)
   - Badge circular en esquina inferior derecha
   - Ventana de chat `380×600px` con animación slide-up
   - Efecto streaming (carácter por carácter)
   - Muestra fuentes debajo de cada respuesta del agente
   - Llama a `POST /api/v1/agent/query` con el JWT del usuario
-- [ ] Integrar widget en el layout principal (visible en todas las pantallas autenticadas)
+- [x] Integrar widget en el layout principal (`App.tsx`, guard por permiso `USE_AGENT`)
 
 #### Consola de soporte — integrada en ticket detail
 

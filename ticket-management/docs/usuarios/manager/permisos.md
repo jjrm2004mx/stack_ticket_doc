@@ -28,7 +28,7 @@ Este documento detalla exactamente qué puede y no puede hacer un Manager en el 
 | REVIEW_DRAFTS | ✅ Activo | Revisar y aprobar tickets borrador |
 | ARCHIVE_TICKET | ❌ No disponible | Solo Admin puede archivar |
 | MANAGE_USERS | ❌ No disponible | Solo Admin puede gestionar usuarios |
-| MANAGE_CLASSIFICATIONS | ❌ No disponible | Solo Admin puede gestionar clasificaciones |
+| MANAGE_CLASSIFICATIONS | ❌ No disponible | Solo Admin puede gestionar áreas y categorías |
 | MANAGE_WORKFLOW | ❌ No disponible | Solo Admin puede configurar el workflow |
 
 **Nota importante:** VIEW_TICKETS está marcado como "siempre activo" en el sistema — no puede ser desactivado por ningún Admin para ningún rol.
@@ -83,7 +83,7 @@ Tener el permiso CHANGE_STATUS no significa que puedas hacer cualquier cambio de
 Con REVIEW_DRAFTS activo puedes:
 - Ver la lista completa de borradores pendientes
 - Abrir y revisar el contenido de cada borrador (incluyendo el email original HTML si aplica)
-- Editar: prioridad, clasificación, categoría, asignado a
+- Editar: prioridad, área, categoría, asignado a
 - Aprobar el borrador (lo activa como ticket ABIERTO)
 
 Lo que **no puedes hacer** con borradores aunque seas Manager:

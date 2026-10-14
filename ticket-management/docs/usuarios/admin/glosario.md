@@ -42,7 +42,7 @@ Campos del ticket que se rellenan automáticamente cuando el ticket pasa a estad
 Ticket con `status = NULL`. Creado por el sistema de ingesta automática (ticket-ingestion-light/n8n) cuando procesa correos entrantes que necesitan revisión humana. Los borradores están en la tabla `tickets` con `status_id = NULL`. Manager puede aprobarlos; Admin puede aprobarlos o eliminarlos.
 
 **approveDraft()**
-Método en `TicketService` (línea 61) que activa un borrador: cambia el status de NULL a OPEN, aplica los campos editados en la revisión (prioridad, clasificación, asignado), y registra la acción. Requiere permiso REVIEW_DRAFTS.
+Método en `TicketService` (línea 61) que activa un borrador: cambia el status de NULL a OPEN, aplica los campos editados en la revisión (prioridad, área, categoría, asignado), y registra la acción. Requiere permiso REVIEW_DRAFTS.
 
 **WorkflowState**
 Entidad persistida en la tabla `workflow_states`. Representa un estado del sistema con toda su configuración: nombre, descripción, color, isInitial, isTerminal, position, notifyRequester. Cada workflow_state tiene un `id` UUID que es referenciado por los tickets.
@@ -77,14 +77,20 @@ Servicio backend (`application/PermissionService.java`) que gestiona la lógica 
 **Tenant / TenantId**
 Identificador de la organización. El sistema es multi-tenant: cada empresa u organización tiene sus propios datos, usuarios y configuraciones aislados. Los permisos en `role_permissions` están asociados a un `tenant_id`.
 
-**Clasificación (Classification)**
-Dominio de conocimiento al que pertenece un ticket. Tabla: `ticket_classifications`. Campos: nombre, color, descripción, tenant_id. Las cuatro clasificaciones por defecto son IT, cliente, operaciones, otro.
+**Área (Classification)**
+Primer nivel del catálogo: el área a la que pertenece un ticket. Tabla: `ticket_classifications`. Campos: nombre, color, descripción, activa, tenant_id. Las cuatro áreas por defecto son IT, cliente, operaciones, otro. El nombre es único sin distinguir mayúsculas.
+
+> **Equivalencia de nombres:** "Área" es el nombre en pantalla; en la API y la base de datos se llama *classification* y el clasificador automático la llama *dominio*. Es el mismo dato.
+
 
 **Categoría (Category)**
-Subcategoría dentro de una Clasificación. Tabla: `ticket_categories`. Vinculada a una clasificación por FK. Ejemplos dentro de IT: hardware, software, red, acceso, vpn.
+Segundo nivel del catálogo, dentro de un área. Tabla: `ticket_categories`. Vinculada a su área por FK. Ejemplos dentro de IT: hardware, software, red, acceso, vpn.
 
 **classificationHint / categoryHint**
-Campos del ticket que guardan el valor original de clasificación/categoría cuando el sistema de IA no encontró una coincidencia exacta en el catálogo. Útiles para detectar la necesidad de agregar nuevas categorías al sistema.
+Campos del ticket que guardan el valor original de área/categoría cuando el clasificador no encontró una coincidencia exacta en el catálogo. Útiles para detectar la necesidad de agregar nuevas categorías al sistema.
+
+**ticket_classification_review (bitácora del clasificador)**
+Guarda, por cada ticket llegado por correo, el área y la categoría que propuso el clasificador, su confianza y la decisión humana final (quién y cuándo). No se muestra en las pantallas de tickets; se exporta desde "🏷️ Áreas y categorías" → "⬇ Exportar revisión del clasificador".
 
 **ticket_email_content**
 Tabla auxiliar que guarda el HTML del correo original para tickets creados por integración de email. El campo `emailBodyHtml` en el modelo Ticket hace referencia a este contenido.
