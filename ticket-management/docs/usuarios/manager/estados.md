@@ -90,7 +90,7 @@ Los borradores no tienen estado visible como Abierto o Cerrado. Son tickets que 
 
 **Como Manager:**
 - Puedes ver todos los borradores en la sección **"Revisión de Borradores"**
-- Puedes editar: prioridad, clasificación, categoría, asignado a
+- Puedes editar: prioridad, área, categoría, asignado a
 - Puedes **aprobar** el borrador → se activa con estado ABIERTO y entra al flujo normal
 - **No puedes** rechazar/eliminar un borrador — eso es función del Admin
 

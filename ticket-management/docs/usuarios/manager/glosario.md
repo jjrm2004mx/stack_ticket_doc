@@ -12,7 +12,7 @@ Definiciones completas de todos los términos del sistema, con contexto específ
 ---
 
 **Ticket**
-Registro formal de una solicitud, problema o tarea. Cada ticket tiene: identificador único (UUID), estado, prioridad, tipo, asignado, creador, clasificación y categoría. Es la unidad central del sistema.
+Registro formal de una solicitud, problema o tarea. Cada ticket tiene: identificador único (UUID), estado, prioridad, tipo, asignado, creador, área y categoría. Es la unidad central del sistema.
 
 **Estado (Status)**
 Etapa actual del ticket en el flujo de trabajo. Los cuatro estados son: OPEN (Abierto), IN_PROGRESS (En Progreso), IN_REVIEW (En Revisión), CLOSED (Cerrado). Como Manager puedes cambiar entre todos excepto la transición directa ABIERTO→CERRADO.
@@ -36,7 +36,7 @@ Registro de cualquier acción realizada sobre el ticket: cambio de estado, edici
 Ticket sin estado activo (`status = NULL`). Creado automáticamente cuando llega un ticket por correo electrónico y necesita revisión humana. No aparece en el flujo normal hasta ser aprobado. Como Manager eres responsable de revisarlos y aprobarlos.
 
 **Aprobar borrador**
-Acción que activa un borrador y lo convierte en ticket ABIERTO. Al aprobar, el ticket entra al flujo normal con la prioridad, clasificación y asignación que definiste en la revisión.
+Acción que activa un borrador y lo convierte en ticket ABIERTO. Al aprobar, el ticket entra al flujo normal con la prioridad, el área, la categoría y la asignación que definiste en la revisión.
 
 **REVIEW_DRAFTS**
 Permiso que permite revisar y aprobar borradores. Activo por defecto para Manager.
@@ -78,18 +78,20 @@ Pantalla de métricas y estadísticas del equipo. Requiere permiso VIEW_DASHBOAR
 **VIEW_TICKET_EVENTS**
 Permiso para ver el historial completo de eventos de un ticket. Activo para Manager. No disponible para rol Usuario.
 
-**Clasificación (Classification)**
-Dominio al que pertenece el ticket. Las cuatro clasificaciones son:
+**Área**
+Primer nivel del catálogo: el área a la que pertenece el ticket. Las cuatro áreas por defecto son:
 - `IT` — tecnología e infraestructura
 - `cliente` — atención y soporte al cliente
 - `operaciones` — procesos y logística
 - `otro` — sin clasificación específica
 
+> **Equivalencia de nombres:** "Área" es el nombre en pantalla; en la API y la base de datos se llama *classification* y el clasificador automático la llama *dominio*. Es el mismo dato.
+
 **Categoría (Category)**
-Subcategoría dentro de la clasificación. Ejemplo: dentro de IT existen hardware, software, red, acceso, correo, impresora, VPN, servidor, base_de_datos, seguridad.
+Segundo nivel del catálogo, dentro de un área. Ejemplo: dentro de IT existen hardware, software, red, acceso, correo, impresora, VPN, servidor, base_de_datos, seguridad.
 
 **classificationHint / categoryHint**
-Campos del ticket que guardan la clasificación/categoría sugerida por el sistema de IA cuando no encontró una coincidencia exacta en el catálogo. Útil para revisar borradores y entender la intención original del clasificador.
+Campos del ticket que guardan el área/categoría sugerida por el clasificador cuando no encontró una coincidencia exacta en el catálogo. Útil para revisar borradores y entender la intención original del clasificador.
 
 **Fecha límite (dueDate)**
 Fecha de resolución esperada del ticket. Configurable al crear o editar. Usada para priorización.

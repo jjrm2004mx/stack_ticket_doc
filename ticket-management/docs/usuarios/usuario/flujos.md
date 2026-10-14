@@ -36,7 +36,7 @@ Un ticket es una solicitud formal al equipo de soporte. Puedes crear uno cuando 
 
 **Qué pasa después:** el equipo revisará el ticket, lo clasificará si es necesario, lo asignará a alguien y comenzará a trabajarlo.
 
-**Nota sobre clasificación:** cuando se crea el ticket, el sistema puede clasificarlo automáticamente en una categoría (IT, Cliente, Operaciones, Otro). Si la clasificación no es correcta, puedes indicarlo en los comentarios.
+**Nota sobre el área:** los tickets que llegan por correo los clasifica automáticamente el sistema en un área (IT, Cliente, Operaciones, Otro) y una categoría. Si no es correcta, indícalo en los comentarios; quien tenga el permiso "Editar tickets" puede corregirla desde el detalle.
 
 ---
 
@@ -60,7 +60,7 @@ Un ticket es una solicitud formal al equipo de soporte. Puedes crear uno cuando 
 | Creado por | Tu nombre |
 | Fecha de creación | Cuándo creaste el ticket |
 | Fecha límite | La fecha que indicaste (si la pusiste) |
-| Clasificación | Dominio y categoría asignados (IT, Cliente, etc.) |
+| Área / Categoría | Área y categoría asignadas (IT, Cliente, etc.) |
 
 ---
 

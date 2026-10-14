@@ -43,7 +43,7 @@ Estas reglas están hardcodeadas en la lógica del sistema y ningún Admin puede
 ### Exclusivos de Admin (no transferibles)
 - **ARCHIVE_TICKET** — ningún rol diferente a Admin puede archivar
 - **MANAGE_USERS** — la gestión de usuarios es exclusiva de Admin
-- **MANAGE_CLASSIFICATIONS** — solo Admin gestiona el catálogo de clasificaciones
+- **MANAGE_CLASSIFICATIONS** — solo Admin gestiona el catálogo de áreas y categorías
 - **MANAGE_WORKFLOW** — solo Admin configura estados y transiciones
 
 ### Opcionales para Admin (Admin puede activarlos/desactivarlos sobre sí mismo)

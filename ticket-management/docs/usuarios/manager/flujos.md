@@ -59,7 +59,7 @@ Como Manager puedes modificar los campos de un ticket existente.
 - Tipo (Tarea / Bug / Feature / Documentación)
 - Fecha límite
 - Horas estimadas
-- Clasificación y categoría
+- Área y categoría
 - Asignado a
 
 **Pasos:**
@@ -149,14 +149,14 @@ Los borradores son tickets que llegaron al sistema (normalmente desde correo ele
 
 **Qué puedes hacer con un borrador:**
 - Ver el contenido original (incluyendo el email HTML si llegó por correo)
-- Editar: prioridad, clasificación, categoría y asignado a
+- Editar: prioridad, área, categoría y asignado a
 - **Aprobar** el borrador → se convierte en ticket ABIERTO y entra al flujo normal
 
 **Cuándo existe un borrador:** cuando el sistema de ingesta automática (ticket-ingestion-light/n8n) procesa un correo entrante y lo crea como borrador para revisión humana.
 
 **Pasos para aprobar:**
 1. Abre el borrador
-2. Revisa y ajusta clasificación, categoría, prioridad y asignación
+2. Revisa y ajusta área, categoría, prioridad y asignación
 3. Haz clic en **"Aprobar"**
 4. El ticket pasa a estado ABIERTO y es visible en el flujo normal
 
@@ -198,7 +198,7 @@ El dashboard muestra estadísticas del estado del equipo.
 | Asignar tickets | ✅ |
 | Archivar tickets | ❌ — solo Admin |
 | Gestionar usuarios | ❌ — solo Admin |
-| Gestionar clasificaciones | ❌ — solo Admin |
+| Gestionar áreas y categorías | ❌ — solo Admin |
 | Configurar workflow | ❌ — solo Admin |
 | Cerrar ticket desde ABIERTO directamente | ❌ — solo Admin |
 
