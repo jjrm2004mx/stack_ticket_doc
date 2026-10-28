@@ -16,23 +16,21 @@ Este documento describe paso a paso todo lo que puedes hacer como Usuario en el 
 Un ticket es una solicitud formal al equipo de soporte. Puedes crear uno cuando tengas un problema, necesites ayuda o quieras reportar algo.
 
 **Pasos:**
-1. En la pantalla principal haz clic en el botón **"Nuevo Ticket"** (ícono `+`)
+1. En la barra de la vista haz clic en **"+ Nuevo ticket"**. Se abre un panel a la derecha que indica en qué estado empezará ("Se crea como …")
 2. Completa el formulario:
    - **Título** *(obligatorio)*: describe el problema en una frase corta y clara. Máximo 255 caracteres. Ejemplo: "No puedo acceder al sistema desde mi computadora"
    - **Descripción** *(opcional pero recomendada)*: explica el problema con detalle. Incluye qué pasó, cuándo ocurrió, qué intentaste hacer. Máximo 10,000 caracteres
-   - **Tipo**: clasifica tu solicitud
-     - `Tarea` — algo que necesitas que hagan
-     - `Bug` — algo que no funciona correctamente
-     - `Feature` — una mejora o funcionalidad nueva
-     - `Documentación` — necesitas información o documentación
-   - **Prioridad**: indica la urgencia
+   - **Solicitante** (recuadro de la derecha): la persona a nombre de quien se crea el ticket (por ejemplo, un cliente que llamó): nombre, correo y **Medio de contacto** (Teléfono, Presencial, Correo, Chat u Otro). Si escribes un correo válido se marca sola la casilla **"Puede recibir avisos por correo"**; puedes desmarcarla. Quien crea el ticket no recibe avisos por crearlo
+   - **Prioridad** (cuatro botones; Media por defecto): indica la urgencia
      - `Baja` — puede esperar, no es urgente
      - `Media` — necesita atención en tiempo razonable
      - `Alta` — afecta tu trabajo, necesita atención pronto
      - `Crítica` — bloqueante total, necesita atención inmediata
-   - **Fecha límite** *(opcional)*: si hay una fecha en la que necesitas resolución
-3. Haz clic en **"Crear"** o **"Guardar"**
-4. El ticket queda en estado **ABIERTO** y el equipo lo verá de inmediato
+   - **Área · Categoría** *(opcional)*: elige el área y, si aplica, su categoría en un solo selector
+   - **Fecha límite** *(opcional)*: si hay una fecha en la que necesitas resolución, con los atajos "Hoy", "Mañana" y "+3 días"; no puede ser anterior a hoy. No aparece si tu organización no usa fecha límite
+   - **Adjuntos** *(si tu rol puede subirlos)*: arrastra, pega (Ctrl+V) o elige archivos; los que no se pueden subir se marcan en rojo
+3. Haz clic en **"Crear ticket"** (o Ctrl+Enter). Si falta el título, el aviso aparece junto al campo. Con **"Crear otro al terminar"** el formulario queda vacío para el siguiente
+4. El ticket queda en el **estado inicial** de tu organización (de fábrica, "Abierto"), aparece el aviso "Ticket #… creado" y se abre su detalle
 
 **Qué pasa después:** el equipo revisará el ticket, lo clasificará si es necesario, lo asignará a alguien y comenzará a trabajarlo.
 
@@ -44,21 +42,21 @@ Un ticket es una solicitud formal al equipo de soporte. Puedes crear uno cuando 
 
 **Cómo ver la lista de tickets:**
 - La pantalla principal muestra todos tus tickets con su estado actual, prioridad y fecha de creación
-- Puedes filtrar por estado, tipo o prioridad usando los controles de la parte superior
+- Puedes filtrar por estado, prioridad o asignado, y buscar por título, solicitante o folio (escribe `#` al inicio) en la única caja de búsqueda
 
 **Cómo abrir el detalle de un ticket:**
-- Haz clic sobre cualquier ticket de la lista para ver su detalle completo
-- En el detalle verás: título, descripción, estado actual, persona asignada, prioridad, tipo, fecha de creación, comentarios y adjuntos
+- Haz doble clic sobre cualquier ticket de la lista o del tablero para ver su detalle completo
+- En el detalle verás: título, descripción, estado actual, persona asignada, prioridad, solicitante, fecha límite, fecha de creación, comentarios y adjuntos
 
 **Campos que puedes ver en el detalle:**
 | Campo | Qué muestra |
 |---|---|
-| Estado | Estado actual (Abierto, En Progreso, En Revisión, Cerrado) |
+| Estado | Estado actual, con el nombre que usa tu organización |
 | Asignado a | Nombre de quien trabaja tu ticket |
 | Prioridad | Baja / Media / Alta / Crítica |
-| Tipo | Tarea / Bug / Feature / Documentación |
 | Creado por | Tu nombre |
 | Fecha de creación | Cuándo creaste el ticket |
+| Solicitante | A nombre de quién se creó, si recibe avisos y el medio |
 | Fecha límite | La fecha que indicaste (si la pusiste) |
 | Área / Categoría | Área y categoría asignadas (IT, Cliente, etc.) |
 
@@ -144,7 +142,7 @@ El historial muestra todos los cambios que tuvo el ticket desde que fue creado.
 No. Una vez creado, solo el equipo (Manager o Admin) puede editar los campos del ticket. Si cometiste un error al crearlo, agrega un comentario con la corrección.
 
 **¿Cómo sé que mi ticket fue recibido?**
-El ticket aparecerá en tu lista inmediatamente con estado ABIERTO. Eso confirma que fue registrado correctamente.
+El ticket aparecerá en tu lista inmediatamente en el estado inicial de tu organización. Eso confirma que fue registrado correctamente.
 
 **¿Puedo crear un ticket para otra persona?**
 El ticket quedará registrado a tu nombre. Si es para otra persona, indícalo en la descripción.
@@ -154,3 +152,15 @@ Agrega un comentario en el ticket explicando la urgencia. También puedes contac
 
 **¿Se me notifica cuando cambia el estado de mi ticket?**
 Depende de la configuración del sistema. Algunos estados envían notificación automática al solicitante. Consulta con tu equipo si no recibes notificaciones.
+
+**¿Cómo cambio mi contraseña?**
+Haz clic en tu nombre o tus iniciales, arriba a la derecha, y elige **"Cambiar contraseña"**. Escribe la actual y la nueva dos veces (mínimo 12 caracteres; puedes usar una frase). Tu sesión sigue abierta y se cierran las de tus otros dispositivos.
+
+**Olvidé mi contraseña.**
+En la página de inicio de sesión haz clic en **"¿Olvidaste tu contraseña?"**, escribe tu correo y abre el enlace que te llega (válido 60 minutos, de un solo uso). Si no llega, revisa tu carpeta de spam o pide a tu administrador que te envíe el enlace.
+
+**Mi cuenta dice "Credenciales inválidas" aunque la contraseña es correcta.**
+Después de 5 intentos fallidos en 15 minutos la cuenta se bloquea 15 minutos. Espera o restablece tu contraseña con "¿Olvidaste tu contraseña?".
+
+**¿Por qué me pide iniciar sesión de nuevo?**
+Si cambiaste o restableciste tu contraseña en otro dispositivo, las demás sesiones terminan y verás "Tu sesión terminó. Inicia sesión de nuevo.".

@@ -26,9 +26,11 @@ causa · remediación · logs relevantes · runbook aplicable · fuentes.
 | **usuario** | ¿Cómo creo un ticket? ¿Qué estados puede tener? ¿Cómo adjunto un archivo? |
 | **manager** | ¿Cómo apruebo un borrador? ¿Qué permisos tengo? |
 | **admin** | ¿Cómo configuro el workflow de clasificación? ¿Cómo gestiono usuarios? |
-| **soporte** | ¿Cómo está configurado n8n? ¿Qué hace langchain-agent? ¿Cómo reinicio el stack? |
+| **soporte** | ¿Cómo está configurado n8n? ¿Hay errores en los logs de notification-service? ¿Cuál es la latencia de ticket-management ahora mismo? |
 
-El rol determina qué documentación consulta — un `usuario` nunca verá runbooks técnicos.
+El rol determina qué documentación consulta y qué capacidades tiene. `soporte` es el único
+rol que puede consultar **logs en tiempo real (Loki)** y **métricas (Prometheus)** además
+de la base de conocimiento. Un `usuario` nunca verá runbooks técnicos ni datos de observabilidad.
 
 ---
 
@@ -49,7 +51,13 @@ El agente consulta cinco fuentes de conocimiento almacenadas en Oracle 23ai:
    (qué llama a qué, dependencias, impacto de caídas). Solo para rol `soporte`
    con preguntas sobre arquitectura
 
-5. **Web — CRAG (condicional)** — si la confianza sobre las fuentes locales es baja,
+5. **Observabilidad en tiempo real — MCP (solo rol `soporte`)** — consulta Loki (logs)
+   y Prometheus (métricas) en tiempo real vía MCP. Se activa con
+   `OBSERVABILITY_ENABLED=true` en `.env`. Requiere que los contenedores
+   `loki-mcp-server` y `prometheus-mcp-server` estén corriendo.
+   Ver `07_mcp_observabilidad.md`
+
+6. **Web — CRAG (condicional)** — si la confianza sobre las fuentes locales es baja,
    el agente busca en DuckDuckGo, comprime los resultados y los fusiona al contexto
    antes de regenerar la respuesta. Se activa con `CRAG_ENABLED=true` en `.env`
 
@@ -89,8 +97,8 @@ La respuesta incluye:
 ### Vía CLI (desarrollo / ingest)
 
 ```bash
-cd ~/stack_ticket/ticket-agent
-source .venv/bin/activate
+# En Rocky, dentro del contenedor que ya corre
+podman exec ticket-agent python -m src.main query --query "¿Cómo creo un ticket?" --rol usuario
 
 # Pregunta como usuario final
 python -m src.main query --query "¿Cómo creo un ticket?" --rol usuario
@@ -114,11 +122,11 @@ python -m src.main query --query "¿Cómo está configurado n8n?" --rol soporte
 
 Si `KB_CHUNKS` está vacío o desactualizado, ver `03_guia_operacional.md`.
 
-Para re-ingestar:
+Para re-ingestar (contenedor efímero, ver `03_guia_operacional.md`):
 ```bash
-cd ~/stack_ticket/ticket-agent
-source .venv/bin/activate
-python -m src.main ingest --source all
+cd ~/stack_agent/ticket-agent && git pull
+bash reingesta.sh revisar
+bash reingesta.sh ingerir
 ```
 
 ---
@@ -147,6 +155,7 @@ python -m src.main ingest --source all
 
 | Variable | Default | Efecto |
 |---|---|---|
+| `OBSERVABILITY_ENABLED=true` | `false` | Habilita consultas de logs (Loki) y métricas (Prometheus) en tiempo real para rol `soporte` |
 | `CRAG_ENABLED=true` | `false` | Búsqueda web (DuckDuckGo) cuando la confianza local es baja |
 | `HYDE_ENABLED=true` | `false` | Genera doc hipotético antes de embedear — mejora retrieval semántico, +~20s |
 | `HYBRID_SEARCH=true` | `false` | Combina búsqueda vectorial + BM25 (requiere Oracle 23ai con índice Oracle Text activo) |
@@ -160,7 +169,7 @@ python -m src.main ingest --source all
 - No recibe eventos de error estructurados — la entrada es siempre texto libre `{query, rol}`
 - No modifica tickets ni interactúa con el sistema de gestión
 - No aprende de las conversaciones — la base de conocimiento se actualiza solo re-ingestando
-- No tiene Diagnostic Agent ni Remediation Agent (próxima fase)
+- No tiene Remediation Agent (propone diagnóstico pero no ejecuta acciones correctivas)
 
 ---
 
@@ -194,6 +203,13 @@ ticket-agent/
 Pregunta + rol
       │
       ▼
+ [intent_router]  →  knowledge | observability | hybrid
+      │                    │
+      │              observability (solo rol soporte)
+      │                    │
+      │             [MCP Loki + Prometheus]  →  respuesta directa
+      │
+      ▼ knowledge
  [HyDE opt-in]  →  genera doc hipotético para mejorar el embedding
       │
       ▼

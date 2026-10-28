@@ -1,166 +1,157 @@
-# Reset de datos para pruebas
+# 09 — Reset de datos de prueba
+## infra-monitoring · Borrar tickets, correos y avisos conservando la configuración
+**Octubre 2026** — tablas verificadas en Rocky el 2026-10-17
 
-Procedimiento para limpiar los datos de tickets en `classifier_db`, `tickets_db`,
-Redis y MinIO antes de iniciar una nueva ronda de pruebas. Conserva toda la
-configuración del sistema (usuarios, workflows, clasificaciones, permisos).
+Borra los **datos de operación** (tickets, correos recibidos, avisos enviados) de las tres
+bases, los Redis y, opcionalmente, MinIO. **Conserva la configuración**: clientes (tenants),
+canales, usuarios, operadores de plataforma, permisos, workflows y estados, clasificaciones
+y categorías, proveedores de envío y todo lo de n8n.
+
+Todo se corre en Rocky. El stack sigue arriba durante el reset. **Respaldar antes**
+(`03_guia_operacional.md` §11): no hay vuelta atrás.
 
 ---
 
 ## 1. Qué se borra y qué se conserva
 
-### ticket-classification
+### classifier_db (ticket-classification)
 
-| Recurso | Componente | Acción | Contenido |
-|---|---|---|---|
-| `classifier_db` | `tickets` | TRUNCATE | Tickets clasificados |
-| `classifier_db` | `agent_runs` | TRUNCATE | Historial de ejecuciones del agente |
-| `classifier_db` | `attachments` | TRUNCATE | Adjuntos asociados a tickets |
-| `classifier_db` | `enrichments` | TRUNCATE | Enriquecimientos de hilo de correo |
-| `classifier-redis` | todas las keys | FLUSHALL | Caché de respuestas LLM |
-| `minio` | bucket `email-attachments` | vaciar | Archivos de adjuntos de correo |
+| Tabla | Acción | Contenido |
+|---|---|---|
+| `inbox_messages` | TRUNCATE CASCADE | Correos recibidos en la bandeja |
+| `inbox_attachments` | (cascada) | Adjuntos de esos correos |
+| `agent_runs` | (cascada) | Corridas del agente por correo |
+| `channel_errors` | TRUNCATE | Errores reportados por los canales |
+| `sender_image_fingerprints` | Conservar (opcional borrar) | Huellas aprendidas de imágenes de firma |
+| `flyway_schema_history` | **Conservar** | Migraciones aplicadas |
 
-### ticket-management
+### tickets_db (ticket-management)
 
-| Recurso | Componente | Acción | Contenido |
-|---|---|---|---|
-| `tickets_db` | `tickets` | TRUNCATE CASCADE | Tickets del sistema |
-| `tickets_db` | `ticket_comments` | (cascada) | Comentarios de tickets |
-| `tickets_db` | `ticket_attachments` | (cascada) | Archivos adjuntos |
-| `tickets_db` | `ticket_label_mapping` | (cascada) | Etiquetas asignadas |
-| `tickets_db` | `ticket_status_history` | (cascada) | Historial de estados |
-| `tickets_db` | `ticket_events` | (cascada) | Eventos de auditoría de ticket |
-| `tickets_db` | `ticket_classification_review` | (cascada) | Revisiones de clasificación |
-| `tickets_db` | `notifications` | (cascada) | Notificaciones del sistema |
-| `tickets_db` | `ticket_email_content` | (cascada) | Contenido de correo original |
-| `tickets_db` | `audit_logs` | TRUNCATE | Logs de auditoría general |
-| `tickets_db` | `ticket_labels` | TRUNCATE | Etiquetas definidas |
-| `ticket-system-redis` | todas las keys | FLUSHALL | Caché de sesiones y API |
-| `ticket-system-minio` | bucket `ticket-attachments` | vaciar | Archivos adjuntos de tickets |
-| `tickets_db` | `tenants` | **CONSERVAR** | Configuración de tenant |
-| `tickets_db` | `users` | **CONSERVAR** | Usuarios y cuentas de sistema |
-| `tickets_db` | `workflows` | **CONSERVAR** | Definición del flujo |
-| `tickets_db` | `workflow_states` | **CONSERVAR** | Estados OPEN/IN_PROGRESS/etc. |
-| `tickets_db` | `workflow_transitions` | **CONSERVAR** | Transiciones permitidas |
-| `tickets_db` | `ticket_classifications` | **CONSERVAR** | Dominios IT/cliente/operaciones |
-| `tickets_db` | `ticket_categories` | **CONSERVAR** | Categorías por dominio |
-| `tickets_db` | `workflow_assignments` | **CONSERVAR** | Asignación de flujo por dominio |
-| `tickets_db` | `role_permissions` | **CONSERVAR** | Permisos por rol |
+| Tabla | Acción | Contenido |
+|---|---|---|
+| `tickets` | TRUNCATE CASCADE | Tickets |
+| `ticket_comments`, `ticket_attachments`, `ticket_status_history`, `ticket_events`, `ticket_classification_review`, `ticket_email_content`, `ticket_channel_replies` | (cascada) | Todo lo que cuelga de un ticket |
+| `event_outbox` | TRUNCATE | Eventos pendientes de publicar a notification-service |
+| `tenants`, `tenant_channels`, `tenant_deletion_steps` | **Conservar** | Clientes y canales |
+| `users`, `user_invitations`, `password_reset_tokens` | **Conservar** | Cuentas |
+| `platform_operators`, `platform_audit_log`, `support_sessions` | **Conservar** | Plataforma y su auditoría |
+| `role_permissions` | **Conservar** | Permisos por rol |
+| `workflows`, `workflow_states`, `workflow_transitions`, `workflow_template_states`, `workflow_template_transitions` | **Conservar** | Estados y transiciones |
+| `ticket_classifications`, `ticket_categories` | **Conservar** | Catálogo de clasificación |
+| `flyway_schema_history` | **Conservar** | Migraciones aplicadas |
 
----
+### notifications_db (notification-service)
 
-## 2. Reset ticket-classification
+| Tabla | Acción | Contenido |
+|---|---|---|
+| `notification_logs` | TRUNCATE | Bitácora de avisos enviados |
+| `notification_provider_configs` | **Conservar** | Por dónde se envía (por canal / tenant) |
 
-### 2a. Base de datos
+### Otros
 
-```bash
-podman exec -it classifier-db psql -U admin -d classifier_db
-```
-
-```sql
-TRUNCATE TABLE enrichments, attachments, agent_runs, tickets
-  RESTART IDENTITY CASCADE;
-```
-
-### 2b. Redis (caché LLM)
-
-```bash
-podman exec -it classifier-redis redis-cli FLUSHALL
-```
-
-### 2c. MinIO (adjuntos de correo)
-
-```bash
-podman exec -it minio mc alias set local http://localhost:9000 minioadmin minioadmin123
-podman exec -it minio mc rm --recursive --force local/email-attachments
-```
+| Recurso | Acción | Nota |
+|---|---|---|
+| `classifier-redis` | FLUSHALL | Caché LLM y límites por canal |
+| `ticket-system-redis` | FLUSHALL | Caché y stream `ticket-events`; obliga a reiniciar notification-service (§4) y cierra las sesiones abiertas del portal |
+| MinIO `minio` / bucket `classifier-inbox` | Opcional (§5) | Archivos de los correos; si se quedan, solo ocupan espacio |
+| MinIO `ticket-system-minio` / bucket `ticket-attachments` | Opcional (§5) | Archivos de los tickets |
+| n8n (`n8n_data`) | **No se toca** | Workflows, credenciales, cursores |
 
 ---
 
-## 3. Reset ticket-management
+## 2. Antes de empezar
 
-### 3a. Base de datos
+1. Respaldo de las tres bases (`03_guia_operacional.md` §11).
+2. Que no entren correos durante el reset: comprobar que las copias de ingesta de los
+   canales están inactivas (`podman exec til-n8n n8n list:workflow --active=true`); si alguna
+   está activa, desactivarla y reactivarla al final.
+
+---
+
+## 3. Bases de datos
+
+Orden: clasificador, después ticket-management, después notificaciones.
 
 ```bash
-podman exec -it ticket-db psql -U ticket_admin -d tickets_db
-```
+podman exec -i classifier-db psql -U admin -d classifier_db <<'SQL'
+TRUNCATE TABLE inbox_messages RESTART IDENTITY CASCADE;
+TRUNCATE TABLE channel_errors RESTART IDENTITY;
+-- opcional: TRUNCATE TABLE sender_image_fingerprints RESTART IDENTITY;
+SQL
 
-```sql
--- Limpia tickets y todas las tablas que dependen de ellos en cascada
+podman exec -i ticket-db psql -U ticket_admin -d tickets_db <<'SQL'
 TRUNCATE TABLE tickets CASCADE;
+TRUNCATE TABLE event_outbox RESTART IDENTITY;
+SQL
 
--- Tablas sin FK a tickets — se limpian por separado
-TRUNCATE TABLE audit_logs RESTART IDENTITY;
-TRUNCATE TABLE ticket_labels RESTART IDENTITY CASCADE;
+podman exec -i notification-db psql -U notif_admin -d notifications_db <<'SQL'
+TRUNCATE TABLE notification_logs RESTART IDENTITY;
+SQL
 ```
 
-`tickets.id` es UUID (no SERIAL), por lo que `RESTART IDENTITY` no aplica sobre él,
-pero sí reinicia los contadores de `audit_logs` y `ticket_labels`.
+`TRUNCATE tickets CASCADE` vacía también las 7 tablas que tienen llave foránea a `tickets`
+y nada más (verificado contra las llaves foráneas de `tickets_db`).
 
-### 3b. Redis (caché de sesiones)
+---
 
-```bash
-podman exec -it ticket-system-redis redis-cli FLUSHALL
-```
+## 4. Redis
 
-### 3c. MinIO (adjuntos de tickets)
+Ambos Redis piden contraseña; se toma de la variable del propio contenedor:
 
 ```bash
-podman exec -it ticket-system-minio mc alias set local http://localhost:9000 minioadmin minioadmin_password_123
-podman exec -it ticket-system-minio mc rm --recursive --force local/ticket-attachments
-```
+podman exec classifier-redis    sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning FLUSHALL'
+podman exec ticket-system-redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning FLUSHALL'
 
-### 3d. Reiniciar notification-service
-
-El `FLUSHALL` elimina el stream y el consumer group de Redis. El `notification-service`
-los recrea solo al arrancar (`@PostConstruct`), por lo que debe reiniciarse:
-
-```bash
+# El FLUSHALL borra el stream y el consumer group: notification-service los recrea al arrancar
 podman restart notification-service
-```
-
-Verifica que levantó sin errores:
-
-```bash
-podman logs --tail 20 notification-service
-# Debe aparecer: [stream] Consumer group creado en stream 'ticket-events'
+podman logs --tail 20 notification-service     # sin errores del stream "ticket-events"
 ```
 
 ---
 
-## 4. Verificación post-reset
+## 5. MinIO (opcional)
+
+Las imágenes de MinIO del stack no traen el cliente `mc` y la imagen `minio/mc` no se puede
+descargar desde Rocky. Si se quiere liberar el espacio, borrar el contenido de la carpeta
+del bucket y reiniciar MinIO (no probado; los archivos huérfanos no afectan al sistema):
 
 ```bash
-# classifier_db — todas deben retornar 0
-podman exec -it classifier-db psql -U admin -d classifier_db -c \
-  "SELECT 'tickets' AS tabla, COUNT(*) FROM tickets
-   UNION ALL SELECT 'agent_runs', COUNT(*) FROM agent_runs
-   UNION ALL SELECT 'enrichments', COUNT(*) FROM enrichments;"
-
-# tickets_db — todas deben retornar 0
-podman exec -it ticket-db psql -U ticket_admin -d tickets_db -c \
-  "SELECT 'tickets' AS tabla, COUNT(*) FROM tickets
-   UNION ALL SELECT 'audit_logs', COUNT(*) FROM audit_logs
-   UNION ALL SELECT 'notifications', COUNT(*) FROM notifications;"
-
-# Redis classifier — debe retornar 0
-podman exec -it classifier-redis redis-cli DBSIZE
-
-# Redis ticket-management — debe retornar 0
-podman exec -it ticket-system-redis redis-cli DBSIZE
-
-# MinIO classifier — debe listar sin objetos
-podman exec -it minio mc ls local/email-attachments
-
-# MinIO ticket-management — debe listar sin objetos
-podman exec -it ticket-system-minio mc ls local/ticket-attachments
+podman exec minio               sh -c 'rm -rf /data/classifier-inbox/*'       && podman restart minio
+podman exec ticket-system-minio sh -c 'rm -rf /minio_data/ticket-attachments/*' && podman restart ticket-system-minio
 ```
 
 ---
 
-## 5. Notas
+## 6. Verificación
 
-- El stack **no necesita reiniciarse** — todos los contenedores siguen corriendo durante el reset.
-- Orden recomendado: classifier primero, ticket-management después, para mantener
-  consistencia si hay un correo en tránsito entre ambos.
-- El volumen `n8n_data` (ticket-ingestion-light) **no se toca** — las credenciales
-  OAuth de Gmail y el workflow viven ahí.
+```bash
+podman exec classifier-db psql -U admin -d classifier_db -At -c \
+  "SELECT 'inbox_messages', count(*) FROM inbox_messages UNION ALL
+   SELECT 'agent_runs', count(*) FROM agent_runs UNION ALL
+   SELECT 'channel_errors', count(*) FROM channel_errors;"
+podman exec ticket-db psql -U ticket_admin -d tickets_db -At -c \
+  "SELECT 'tickets', count(*) FROM tickets UNION ALL
+   SELECT 'ticket_events', count(*) FROM ticket_events UNION ALL
+   SELECT 'event_outbox', count(*) FROM event_outbox UNION ALL
+   SELECT 'tenants (se conservan)', count(*) FROM tenants UNION ALL
+   SELECT 'users (se conservan)', count(*) FROM users;"
+podman exec notification-db psql -U notif_admin -d notifications_db -At -c \
+  "SELECT 'notification_logs', count(*) FROM notification_logs;"
+bash ~/stack_ticket/infra-monitoring/health-check.sh
+```
+
+Todo en 0 salvo lo marcado "se conservan"; health-check 10/10.
+
+---
+
+## 7. Después del reset
+
+- **Volver a cargar correos ya leídos**: el cursor de cada canal en n8n sigue adelante, así
+  que los correos viejos no vuelven a entrar solos. Para recargarlos, en la consola de
+  plataforma → cliente → canal → "Cambiar fecha" (kickoff): la ingesta vuelve a empezar en
+  esa fecha y, como la bandeja quedó vacía, los convierte otra vez en tickets.
+- Reactivar las copias de ingesta que se hayan desactivado en el §2.
+
+---
+
+*infra-monitoring · Reset de datos de prueba · Octubre 2026*

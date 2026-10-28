@@ -1,301 +1,281 @@
-# 11 — Puertos y Redes del Ecosistema
-## infra-monitoring · Referencia completa de contenedores, puertos y topología de red
-**Mayo 2026**
+# 11 — Puertos, Redes y Bases de Datos del Ecosistema
+## infra-monitoring · Referencia completa de contenedores, puertos, redes, bases de datos y flujos
+**Octubre 2026** — verificado en Rocky (TIJDCAGENTIA, `10.187.21.30`) el 2026-10-17
 
 ---
 
 ## Índice
 
 1. [Tabla maestra de puertos](#1-tabla-maestra-de-puertos)
-2. [Redes del ecosistema](#2-redes-del-ecosistema)
-3. [Pertenencia de contenedores a redes](#3-pertenencia-de-contenedores-a-redes)
-4. [Comunicaciones internas entre servicios](#4-comunicaciones-internas-entre-servicios)
-5. [Diagrama de topología](#5-diagrama-de-topología)
-6. [Notas y conflictos conocidos](#6-notas-y-conflictos-conocidos)
+2. [Puertos que deben estar libres antes de levantar el stack](#2-puertos-que-deben-estar-libres-antes-de-levantar-el-stack)
+3. [Redes del ecosistema](#3-redes-del-ecosistema)
+4. [Pertenencia de contenedores a redes](#4-pertenencia-de-contenedores-a-redes)
+5. [Bases de datos y almacenamiento](#5-bases-de-datos-y-almacenamiento)
+6. [Comunicaciones entre servicios](#6-comunicaciones-entre-servicios)
+7. [Notas y conflictos conocidos](#7-notas-y-conflictos-conocidos)
 
 ---
 
 ## 1. Tabla maestra de puertos
 
-Todos los contenedores del ecosistema con su puerto en el host, puerto interno y URL de acceso local.
+Puerto en el host (Rocky) → puerto dentro del contenedor. Todos publican **solo en
+`127.0.0.1`** salvo el portal (8090), que publica en todas las interfaces: desde otra
+máquina solo responde `http://10.187.21.30:8090`; el resto se usa con el túnel SSH,
+también desde cualquier otra máquina de la oficina (`10_redes_y_acceso_lan.md` §7).
 
 ### ticket-management
 
-| Contenedor | Puerto host | Puerto interno | Protocolo | URL localhost | Descripción |
-|---|---|---|---|---|---|
-| `ticket-system-frontend` | 8090 | 80 | HTTP | http://localhost:8090 | Portal web de tickets (Nginx + Vite) |
-| `ticket-system-backend` | 8080 | 8080 | HTTP | http://localhost:8080/api/v1 | API REST Spring Boot |
-| `ticket-db` | 5433 | 5432 | TCP | localhost:5433 | PostgreSQL — `tickets_db` |
-| `ticket-system-redis` | 6380 | 6379 | TCP | localhost:6380 | Redis — caché y sesiones |
-| `ticket-system-minio` | 9002 | 9000 | HTTP | http://localhost:9002 | MinIO API — adjuntos de tickets |
-| `ticket-system-minio` | 9003 | 9001 | HTTP | http://localhost:9003 | MinIO consola web |
-| `ticket-flyway` | — | — | — | — | Migraciones one-shot, sin puerto |
+| Contenedor | Puerto host | Puerto interno | URL en Rocky | Descripción |
+|---|---|---|---|---|
+| `ticket-system-frontend` | 8090 | 80 | http://localhost:8090 | Portal web (Nginx + Vite) |
+| `ticket-system-backend` | 8080 | 8080 | http://localhost:8080/api/v1 | API REST Spring Boot |
+| `ticket-db` | 5433 | 5432 | localhost:5433 | PostgreSQL — `tickets_db` |
+| `ticket-system-redis` | 6380 | 6379 | localhost:6380 | Redis — caché y stream de eventos `ticket-events` |
+| `ticket-system-minio` | 9002 / 9003 | 9000 / 9001 | http://localhost:9002 | MinIO — adjuntos de tickets (API / consola) |
+| `ticket-flyway` | — | — | — | Migraciones one-shot |
 
 ### ticket-classification
 
-| Contenedor | Puerto host | Puerto interno | Protocolo | URL localhost | Descripción |
-|---|---|---|---|---|---|
-| `langchain-agent` | 8001 | 8001 | HTTP | http://localhost:8001 | Agente LangGraph — punto de entrada `/process` |
-| `langchain-api` | 8000 | 8000 | HTTP | http://localhost:8000 | Gateway LLM — `/ask` con provider intercambiable |
-| `ollama` | 11434 | 11434 | HTTP | http://localhost:11434 | Modelos LLM locales (llama3.2:3b por defecto) |
-| `classifier-db` | 5434 | 5432 | TCP | localhost:5434 | PostgreSQL — `classifier_db` |
-| `classifier-redis` | 6381 | 6379 | TCP | localhost:6381 | Redis — caché LLM (TTL 1h) + estado agente |
-| `minio` | 9000 | 9000 | HTTP | http://localhost:9000 | MinIO API — adjuntos de correos |
-| `minio` | 9001 | 9001 | HTTP | http://localhost:9001 | MinIO consola web |
-| `classifier-flyway` | — | — | — | — | Migraciones one-shot, sin puerto |
+| Contenedor | Puerto host | Puerto interno | URL en Rocky | Descripción |
+|---|---|---|---|---|
+| `langchain-agent` | 8001 | 8001 | http://localhost:8001 | Clasificador: bandeja `/inbox/*` y agente LangGraph |
+| `langchain-api` | 8000 | 8000 | http://localhost:8000 | Gateway LLM `/ask` (proveedor intercambiable) |
+| `ollama` | 11434 | 11434 | http://localhost:11434 | LLM local (`llama3.2:3b`); en Rocky no es el proveedor activo |
+| `classifier-db` | 5434 | 5432 | localhost:5434 | PostgreSQL — `classifier_db` |
+| `classifier-redis` | 6381 | 6379 | localhost:6381 | Redis — caché LLM y límites por canal |
+| `minio` | 9000 / 9001 | 9000 / 9001 | http://localhost:9000 | MinIO — adjuntos de la bandeja (bucket `classifier-inbox`) |
+| `classifier-flyway` | — | — | — | Migraciones one-shot |
 
 ### notification-service
 
-| Contenedor | Puerto host | Puerto interno | Protocolo | URL localhost | Descripción |
-|---|---|---|---|---|---|
-| `notification-service` | 8081 | 8081 | HTTP | http://localhost:8081 | API REST Spring Boot — envío de notificaciones |
-| `notification-db` | 5435 | 5432 | TCP | localhost:5435 | PostgreSQL — `notifications_db` |
+| Contenedor | Puerto host | Puerto interno | URL en Rocky | Descripción |
+|---|---|---|---|---|
+| `notification-service` | 8081 | 8081 | http://localhost:8081 | API Spring Boot — avisos por correo |
+| `notification-db` | 5435 | 5432 | localhost:5435 | PostgreSQL — `notifications_db` |
 
-### ticket-agent
+### ticket-agent (en `~/stack_agent`)
 
-| Contenedor | Puerto host | Puerto interno | Protocolo | URL localhost | Descripción |
-|---|---|---|---|---|---|
-| `ticket-agent` | 8002 | 8002 | HTTP | http://localhost:8002 | RAG API — `POST /api/v1/query`, FAISS + ONNX + LangGraph |
+| Contenedor | Puerto host | Puerto interno | URL en Rocky | Descripción |
+|---|---|---|---|---|
+| `ticket-agent` | 8002 | 8002 | http://localhost:8002 | Asistente RAG — `POST /api/v1/query` |
+| `loki-mcp-server` | 9011 (solo `127.0.0.1`) | 9011 | http://127.0.0.1:9011 | MCP de logs (Loki) para el asistente |
+| `prometheus-mcp-server` | 9012 (solo `127.0.0.1`) | 9012 | http://127.0.0.1:9012 | MCP de métricas (Prometheus) para el asistente |
+
+### support-console (en `~/stack_agent`)
+
+| Contenedor | Puerto host | Puerto interno | URL en Rocky | Descripción |
+|---|---|---|---|---|
+| `sc-nginx` | 3001 (`SC_PORT`) | 80 | http://localhost:3001 | Consola de soporte — UI del asistente |
 
 ### ticket-ingestion-light
 
-| Contenedor | Puerto host | Puerto interno | Protocolo | URL localhost | Descripción |
-|---|---|---|---|---|---|
-| `til-n8n` | 5679 | 5678 | HTTP | http://localhost:5679 | n8n — editor y webhook receiver |
+| Contenedor | Puerto host | Puerto interno | URL en Rocky | Descripción |
+|---|---|---|---|---|
+| `til-n8n` | 5679 | 5678 | http://localhost:5679 | n8n — ingesta por canal y webhooks de envío |
 
 ### infra-monitoring
 
-| Contenedor | Puerto host | Puerto interno | Protocolo | URL localhost | Descripción |
-|---|---|---|---|---|---|
-| `prometheus` | 9090 | 9090 | HTTP | http://localhost:9090 | Métricas — scrape de todo el ecosistema |
-| `grafana` | 3000 | 3000 | HTTP | http://localhost:3000 | Dashboards (admin / admin) |
-| `loki` | 3100 | 3100 | HTTP | http://localhost:3100 | Agregación de logs |
-| `node-exporter` | 9100 | 9100 | HTTP | http://localhost:9100 | Métricas del host (CPU, RAM, disco) |
-| `promtail` | — | — | — | — | Recolector journald → Loki, sin puerto expuesto |
+| Contenedor | Puerto host | Puerto interno | URL en Rocky | Descripción |
+|---|---|---|---|---|
+| `prometheus` | 9090 | 9090 | http://localhost:9090 | Métricas |
+| `grafana` | 3000 | 3000 | http://localhost:3000 | Dashboards |
+| `loki` | 3100 | 3100 | http://localhost:3100 | Logs |
+| `node-exporter` | 9100 | 9100 | http://localhost:9100 | Métricas del host |
+| `promtail` | — | — | — | Recolector journald → Loki |
 
 ---
 
-## 2. Redes del ecosistema
+## 2. Puertos que deben estar libres antes de levantar el stack
 
-### Redes externas (compartidas entre stacks)
+Lista completa de puertos publicados en el host:
 
-Creadas por `infra-monitoring/startup.sh` con subnets fijas para evitar colisiones.
+```
+3000 3001 3100 5433 5434 5435 5679 6380 6381 8000 8001 8002 8080 8081 8090
+9000 9001 9002 9003 9011 9012 9090 9100 11434
+```
 
-| Red | Subnet | Propósito |
-|---|---|---|
-| `ticket-management-network` | 10.89.1.0/24 | Bus principal — conecta ticket-management, classification, notification y n8n |
-| `ticket-classification-network` | 10.89.2.0/24 | Red interna de clasificación — LLM, DB, Redis, MinIO del clasificador |
-| `observability-network` | 10.89.3.0/24 | Monitoreo — Prometheus, Grafana, Loki, Promtail, node-exporter |
+Comprobar en Rocky, con el stack abajo, que ninguno esté ocupado:
 
-### Redes internas (locales a cada stack)
+```bash
+for p in 3000 3001 3100 5433 5434 5435 5679 6380 6381 8000 8001 8002 8080 8081 8090 \
+         9000 9001 9002 9003 9011 9012 9090 9100 11434; do
+  ss -ltn "sport = :$p" | grep -q LISTEN && echo "OCUPADO: $p"
+done
+```
 
-Creadas por el propio `docker-compose.yml` de cada proyecto. Solo conectan contenedores del mismo stack.
-
-| Red | Stack | Contenedores |
-|---|---|---|
-| `ticket-network` | ticket-management | ticket-system-frontend, ticket-system-backend, ticket-db, ticket-system-redis, ticket-system-minio, ticket-flyway |
-| `notification-network` | notification-service | notification-service, notification-db |
-| `stack` | ticket-ingestion-light | til-n8n |
-| *(ninguna)* | ticket-agent | `ticket-agent` solo necesita la red compartida |
+Con el stack arriba, `podman ps --format "{{.Names}} {{.Ports}}"` muestra quién tiene cada
+puerto (todos `127.0.0.1:` salvo `0.0.0.0:8090`). Único puerto que debe estar abierto en
+firewalld para la LAN, además del 22 de SSH: 8090 (ver `10_redes_y_acceso_lan.md` §7).
 
 ---
 
-## 3. Pertenencia de contenedores a redes
+## 3. Redes del ecosistema
 
-Vista por red compartida — qué contenedores pueden comunicarse entre sí.
+Ninguna red tiene subred fija: Podman (netavark, rootless) asigna la primera libre de
+`10.89.0.0/16` al crearla, y nada depende de la subred. Las de abajo son las que tiene
+Rocky hoy.
 
-### ticket-management-network (10.89.1.0/24)
+### Redes externas (compartidas, las crea `startup.sh` si faltan)
 
-| Contenedor | Stack de origen |
+| Red | Subnet en Rocky | Propósito |
+|---|---|---|
+| `ticket-management-network` | 10.89.0.0/24 | Bus entre stacks: solo servicios que se hablan de un stack a otro |
+| `ticket-classification-network` | 10.89.2.0/24 | Clasificación: LLM, BD, Redis y MinIO del clasificador |
+| `observability-network` | 10.89.3.0/24 | Monitoreo, asistente y servidores MCP |
+
+### Redes internas (las crea el compose de cada stack)
+
+| Red | Subnet en Rocky | Contenedores |
+|---|---|---|
+| `ticket-management_ticket-network` | 10.89.1.0/24 | frontend, backend, ticket-db, ticket-system-redis, ticket-system-minio, flyway |
+| `support-console_default` | 10.89.4.0/24 | sc-nginx |
+| `notification-service_notification-network` | 10.89.5.0/24 | notification-service, notification-db |
+| `ticket-ingestion-light_stack` | 10.89.6.0/24 | til-n8n |
+
+---
+
+## 4. Pertenencia de contenedores a redes
+
+| Contenedor | Redes |
 |---|---|
-| `ticket-system-backend` | ticket-management |
-| `ticket-db` | ticket-management |
-| `ticket-system-redis` | ticket-management |
-| `langchain-agent` | ticket-classification |
-| `classifier-db` | ticket-classification |
-| `notification-service` | notification-service |
-| `notification-db` | notification-service |
-| `til-n8n` | ticket-ingestion-light |
-| `ticket-agent` | ticket-agent |
-| `prometheus` | infra-monitoring |
+| `ticket-system-frontend` | ticket-management_ticket-network |
+| `ticket-system-backend` | ticket-management-network, ticket-management_ticket-network |
+| `ticket-db` | ticket-management_ticket-network |
+| `ticket-system-redis` | ticket-management-network, ticket-management_ticket-network |
+| `ticket-system-minio` | ticket-management_ticket-network |
+| `langchain-agent` | ticket-classification-network, ticket-management-network |
+| `langchain-api`, `ollama`, `classifier-redis`, `minio` | ticket-classification-network |
+| `classifier-db` | ticket-classification-network |
+| `notification-service` | notification-service_notification-network, ticket-management-network |
+| `notification-db` | notification-service_notification-network |
+| `til-n8n` | ticket-ingestion-light_stack, ticket-management-network |
+| `ticket-agent` | observability-network, ticket-management-network |
+| `loki-mcp-server`, `prometheus-mcp-server` | observability-network |
+| `sc-nginx` | support-console_default |
+| `prometheus` | observability-network, ticket-classification-network, ticket-management-network |
+| `grafana`, `loki`, `promtail`, `node-exporter` | observability-network |
 
-### ticket-classification-network (10.89.2.0/24)
+Las bases de datos y los MCP no están en `ticket-management-network`: solo los usa su propio
+stack. Para comprobarlo: `podman inspect <contenedor> --format "{{range \$k,\$v := .NetworkSettings.Networks}}{{\$k}} {{end}}"`.
 
-| Contenedor | Stack de origen |
+---
+
+## 5. Bases de datos y almacenamiento
+
+Cada servicio guarda y recupera lo suyo; no hay base compartida.
+
+| Almacén | Tecnología | Contenedor / ubicación | Dueño | Qué guarda |
+|---|---|---|---|---|
+| `tickets_db` | PostgreSQL 15 | `ticket-db` (5433) | ticket-management | Tenants, canales, usuarios, operadores de plataforma, permisos, workflows y estados, tickets y su historial, auditoría, outbox de eventos. Migraciones Flyway (`ticket-flyway`) |
+| `classifier_db` | PostgreSQL 15 | `classifier-db` (5434) | ticket-classification | Bandeja persistente de correos (`inbox_messages`, `inbox_attachments`), corridas del agente, errores de canal, huellas de imágenes de firma. Flyway (`classifier-flyway`) |
+| `notifications_db` | PostgreSQL 15 | `notification-db` (5435) | notification-service | Bitácora de envíos (`notification_logs`) y proveedor de envío por canal/tenant (`notification_provider_configs`) |
+| Redis de management | Redis 7.2 | `ticket-system-redis` (6380) | ticket-management | Caché y stream `ticket-events` que consume notification-service |
+| Redis del clasificador | Redis 7.2 | `classifier-redis` (6381) | ticket-classification | Caché LLM y límites por canal |
+| MinIO de management | MinIO | `ticket-system-minio` (9002) | ticket-management | Bucket `ticket-attachments` |
+| MinIO del clasificador | MinIO | `minio` (9000) | ticket-classification | Bucket `classifier-inbox` (`t<tenant>/<canal>/<mensaje>/…`) |
+| Base de conocimiento del asistente | **Oracle Autonomous Database** (OCI, en la nube) | Fuera de Rocky; wallet en el host | ticket-agent | Fragmentos de documentos (`KB_CHUNKS`) y grafo de arquitectura. En Rocky `VECTOR_STORE=oracle`; la alternativa local es FAISS |
+| n8n | SQLite | Volumen `ticket-ingestion-light_n8n_data` | ticket-ingestion-light | Workflows, credenciales de Microsoft Graph, llaves de canal y cursores de ingesta |
+| Grafana / Prometheus / Loki | Volúmenes propios | infra-monitoring | infra-monitoring | Dashboards, series de métricas y logs |
+
+Usuarios de las bases PostgreSQL: `ticket_admin` (tickets_db), `admin` (classifier_db),
+`notif_admin` (notifications_db). Las contraseñas están en el `.env` de cada repo.
+
+Consola rápida: `podman exec -it ticket-db psql -U ticket_admin -d tickets_db` (análogo
+para las otras dos). Respaldo y restauración: `03_guia_operacional.md` §11.
+
+---
+
+## 6. Comunicaciones entre servicios
+
+URLs internas (se resuelven por nombre de contenedor dentro de las redes Podman).
+
+### Correo → ticket
+
+```
+Buzón Outlook del canal (Microsoft Graph, internet)
+  ◄── til-n8n: copia "Canal … — ingesta" (cada 2 min, solo lectura)
+        └─► GET/POST http://langchain-agent:8001/inbox/channel | /inbox/email   (X-Channel-Key)
+              (ticket-management-network)
+              langchain-agent
+              ├─► http://ticket-system-backend:8080/api/v1/...   (resolver canal, crear ticket)
+              ├─► http://langchain-api:8000/ask ─► OCI Generative AI (openai.gpt-oss-20b, internet)
+              ├─► classifier-db:5432, classifier-redis:6379, minio:9000
+```
+
+### Ticket → aviso por correo
+
+```
+ticket-system-backend ─► event_outbox (tickets_db) ─► stream "ticket-events" en ticket-system-redis
+  notification-service (consume el stream)
+    ├─► aviso de un ticket con canal: POST http://til-n8n:5678/webhook/canal-<id>/send (X-Send-Secret)
+    └─► sin canal (cuenta, contraseña):  POST http://til-n8n:5678/webhook/send-email
+          til-n8n ─► Microsoft Graph sendMail (internet)
+```
+
+Si el canal no tiene fila activa en `notification_provider_configs`, el aviso **no se
+envía** (falla cerrado). Detalle: ticket-ingestion-light `02_arquitectura_tecnica.md`.
+
+### Asistente
+
+```
+Navegador ─► sc-nginx:3001 (consola de soporte) ─► http://localhost:8002 (ticket-agent)
+Portal ─► ticket-system-backend /agent/query ─► http://ticket-agent:8002/api/v1/query
+ticket-agent ─► Oracle ADB y OCI GenAI (internet)
+             ─► loki-mcp-server:9011, prometheus-mcp-server:9012
+```
+
+### Métricas (Prometheus, `prometheus.yml`)
+
+| Job | Destino |
 |---|---|
-| `langchain-agent` | ticket-classification |
-| `langchain-api` | ticket-classification |
-| `ollama` | ticket-classification |
-| `classifier-db` | ticket-classification |
-| `classifier-redis` | ticket-classification |
-| `minio` | ticket-classification |
-| `classifier-flyway` | ticket-classification |
-| `prometheus` | infra-monitoring |
+| `ticket-management` | `ticket-system-backend:8080/api/v1/actuator/prometheus` |
+| `notification-service` | `notification-service:8081/actuator/prometheus` |
+| `langchain-agent` | `langchain-agent:8001/metrics` |
+| `langchain-api` | `langchain-api:8000/metrics` |
+| `ticket-agent` | `ticket-agent:8002/metrics` |
+| `node-exporter` | `node-exporter:9100` |
+| `prometheus` | `localhost:9090` |
 
-### observability-network (10.89.3.0/24)
-
-| Contenedor | Stack de origen |
-|---|---|
-| `prometheus` | infra-monitoring |
-| `grafana` | infra-monitoring |
-| `loki` | infra-monitoring |
-| `promtail` | infra-monitoring |
-| `node-exporter` | infra-monitoring |
+Logs: promtail lee journald del host y etiqueta `container` y `service`
+(Grafana → Explore → Loki → `{container="<nombre>"}`).
 
 ---
 
-## 4. Comunicaciones internas entre servicios
+## 7. Notas y conflictos conocidos
 
-URLs que usan los contenedores para hablarse entre sí (dentro de las redes Podman).
-Estas URLs nunca pasan por el host — se resuelven por nombre de contenedor.
+### Subredes asignadas por Podman
 
-### Flujo principal: correo → ticket
+`startup.sh` (y los `start.sh` de cada repo) crean una red compartida solo si falta y sin
+`--subnet`; nunca borran redes ni contenedores. Por eso las subredes de Rocky no siguen un
+orden (la compartida quedó en `10.89.0.0/24` y la interna de ticket-management en
+`10.89.1.0/24`) y no importa. **No crear redes a mano con `--subnet`**: una subred fija dentro
+de `10.89.0.0/16` puede chocar con las que Podman asigna solo.
 
-```
-til-n8n
-  └─► POST http://langchain-agent:8001/process
-        (ticket-management-network)
-        └─► GET  http://ticket-system-backend:8080/api/v1/catalogo
-        │         (ticket-management-network)
-        └─► POST http://langchain-api:8000/ask
-        │         (ticket-classification-network)
-        │         └─► http://ollama:11434  (ticket-classification-network)
-        └─► POST http://ticket-system-backend:8080/api/v1/tickets
-                  (ticket-management-network)
-```
+El portal (nginx) toma su DNS del `resolv.conf` del contenedor al arrancar, así que tampoco
+depende de ninguna IP.
 
-### Flujo de notificaciones: ticket → correo
+### Dos MinIO y dos Redis
 
-```
-ticket-system-backend
-  └─► POST http://notification-service:8081/...
-        (ticket-management-network)
-        └─► POST http://til-n8n:5678/webhook/notification-webhook
-                  (ticket-management-network)
-                  └─► Gmail API  (internet)
-```
-
-### Bases de datos e infraestructura
-
-| Desde | Hacia | URL interna | Red |
-|---|---|---|---|
-| `ticket-system-backend` | `ticket-db` | `ticket-db:5432` | ticket-network |
-| `ticket-system-backend` | `ticket-system-redis` | `ticket-system-redis:6379` | ticket-network |
-| `ticket-system-backend` | `ticket-system-minio` | `http://ticket-system-minio:9000` | ticket-network |
-| `notification-service` | `notification-db` | `notification-db:5432` | notification-network |
-| `notification-service` | `ticket-system-redis` | `ticket-system-redis:6379` | ticket-management-network |
-| `langchain-agent` | `classifier-db` | `classifier-db:5432` | ticket-classification-network |
-| `langchain-agent` | `classifier-redis` | `classifier-redis:6379` | ticket-classification-network |
-| `langchain-agent` | `minio` | `minio:9000` | ticket-classification-network |
-| `langchain-api` | `classifier-redis` | `classifier-redis:6379` | ticket-classification-network |
-| `langchain-api` | `ollama` | `http://ollama:11434` | ticket-classification-network |
-
-### Scrape de métricas (Prometheus)
-
-| Prometheus scrape | URL interna | Red |
-|---|---|---|
-| Prometheus mismo | `localhost:9090` | observability-network |
-| `ticket-system-backend` | `ticket-system-backend:8080` | ticket-management-network |
-| `langchain-agent` | `langchain-agent:8001` | ticket-classification-network |
-| `node-exporter` | `node-exporter:9100` | observability-network |
-
----
-
-## 5. Diagrama de topología
-
-```
-╔══════════════════════════════════════════════════════════════════╗
-║  ticket-management-network  (10.89.1.0/24)                       ║
-║                                                                  ║
-║  ticket-system-backend:8080  ◄──────────────────────────────┐   ║
-║  ticket-system-redis:6379    ◄──── notification-service      │   ║
-║  ticket-db:5432              ◄──── (notification-network)    │   ║
-║  ticket-system-minio:9000    ◄────┘                          │   ║
-║                                                               │   ║
-║  langchain-agent:8001 ◄──── til-n8n:5678 ◄────── Gmail       │   ║
-║  (+ ticket-classification-network)   │                        │   ║
-║                                      └── webhook ────────────┘   ║
-║  classifier-db:5432                                              ║
-║  notification-service:8081 ◄─── ticket-system-backend            ║
-║  notification-db:5432                                            ║
-║  til-n8n:5678                                                    ║
-║  ticket-agent:8002  (RAG API — consultas externas por 8002)      ║
-║  prometheus:9090                                                 ║
-╚══════════════════════════════════════════════════════════════════╝
-
-╔══════════════════════════════════════════════════════════════════╗
-║  ticket-classification-network  (10.89.2.0/24)                   ║
-║                                                                  ║
-║  langchain-agent:8001 ──► langchain-api:8000 ──► ollama:11434   ║
-║  classifier-db:5432                                              ║
-║  classifier-redis:6379                                           ║
-║  minio:9000                                                      ║
-║  prometheus:9090 (solo scrape)                                   ║
-╚══════════════════════════════════════════════════════════════════╝
-
-╔══════════════════════════════════════════════════════════════════╗
-║  observability-network  (10.89.3.0/24)                           ║
-║                                                                  ║
-║  prometheus:9090 ──► grafana:3000                                ║
-║  loki:3100        ──► grafana:3000                               ║
-║  promtail ──────────► loki:3100                                  ║
-║  node-exporter:9100 (prometheus lo scrape desde ticket-mgmt-net) ║
-╚══════════════════════════════════════════════════════════════════╝
-```
-
----
-
-## 6. Notas y conflictos conocidos
-
-### Dos instancias de MinIO en el mismo host
-
-El ecosistema tiene dos MinIO independientes, cada uno en un stack distinto:
-
-| Contenedor | Puerto host API | Puerto host consola | Uso |
-|---|---|---|---|
-| `minio` (ticket-classification) | **9000** | **9001** | Adjuntos de correos entrantes |
-| `ticket-system-minio` (ticket-management) | **9002** | **9003** | Adjuntos de tickets creados |
-
-No hay conflicto de puertos en el host. No confundir sus credenciales — son instancias separadas.
-
-### Dos instancias de Redis en el mismo host
-
-| Contenedor | Puerto host | Uso |
-|---|---|---|
-| `ticket-system-redis` | 6380 | Caché de ticket-management y notification-service |
-| `classifier-redis` | 6381 | Caché LLM (TTL 1h) + estado del agente LangGraph |
-
-`notification-service` usa `ticket-system-redis` (no su propio Redis) a través de `ticket-management-network`.
+Son instancias independientes con credenciales distintas: `minio` (9000/9001) y
+`ticket-system-minio` (9002/9003); `classifier-redis` (6381) y `ticket-system-redis`
+(6380). Ambos Redis piden contraseña (`REDIS_PASSWORD` dentro del contenedor):
+`podman exec ticket-system-redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning DBSIZE'`.
 
 ### n8n: puerto externo vs interno
 
-`til-n8n` escucha internamente en el puerto **5678** (convención n8n).
-En el host se expone como **5679** para evitar colisión con otras instancias n8n.
-Los demás contenedores que llaman a n8n deben usar `til-n8n:5678` (puerto interno).
+`til-n8n` escucha en 5678; en el host es 5679. Los contenedores usan `til-n8n:5678`.
 
-### NOTIFICATION_PORTAL_URL — URL pública del portal
+### Todo en loopback salvo el portal
 
-`notification-service` necesita la URL pública accesible desde el navegador para generar
-el botón "Ver el estado de mi ticket" en los correos. Esta URL **no es** una comunicación
-interna — es la URL que abre el usuario final.
+Desde el cambio `aislar-redes-y-puertos` todos los `ports` de los compose llevan
+`127.0.0.1:` excepto `ticket-system-frontend` (`8090:80`). Abrir un puerto en firewalld no
+lo expone: habría que quitar además ese prefijo.
 
-Se inyecta a través de `~/stack_ticket/.env.deploy` (ver runbook `10_redes_y_acceso_lan.md`).
-`infra-monitoring/startup.sh` la detecta automáticamente usando PowerShell para obtener
-la IP LAN real de Windows (no la IP virtual de WSL).
+### URL pública del portal en los correos
 
----
-
-### ticket-agent — acceso a Ollama desde el contenedor
-
-`ticket-agent` está en `ticket-management-network` pero Ollama vive en
-`ticket-classification-network`. Ambas redes no están conectadas directamente.
-
-La solución es acceder a Ollama por el host WSL:
-- `OLLAMA_BASE_URL=http://host.containers.internal:11434`
-
-`host.containers.internal` resuelve a la IP del host Windows en Podman rootless WSL.
-Si PROVIDER=oci, esta variable no se usa y el problema no aplica.
+`NOTIFICATION_PORTAL_URL` (notification-service) es la URL que abre el usuario final desde
+el correo; en Rocky `http://10.187.21.30:8090`.
 
 ---
 
-*infra-monitoring · Puertos y Redes · Mayo 2026*
+*infra-monitoring · Puertos, Redes y Bases de Datos · Octubre 2026*

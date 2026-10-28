@@ -7,134 +7,103 @@ fuente: ticket-management
 
 # Estados y transiciones — Admin
 
-Como Admin tienes acceso a todas las transiciones del sistema, incluyendo las que están restringidas para Manager y Usuario. Este documento detalla el mapa completo de estados y las capacidades exclusivas de Admin.
+Cada organización define sus propios estados de ticket. Como Admin (con el permiso "Gestionar workflow") configuras los estados, las transiciones entre ellos y a quién se le avisa. Este documento explica el modelo y la pantalla de configuración.
 
 ---
 
-## Los cuatro estados del sistema
+## Nombre y categoría de un estado
 
-### OPEN — Abierto
-- **Estado inicial:** sí, todos los tickets nuevos comienzan aquí
-- **Es terminal:** no
-- **notifyRequester:** según configuración del workflow
-- **Posición en el flujo:** 1
+Cada estado tiene:
 
-### IN_PROGRESS — En Progreso
-- **Estado inicial:** no
-- **Es terminal:** no
-- **Posición en el flujo:** 2
+- **Nombre:** lo eliges tú y lo ve todo el mundo (por ejemplo "Esperando cliente" o "En diagnóstico"). Lo puedes cambiar cuando quieras.
+- **Categoría:** lo que entiende el sistema. Es fija desde que creas el estado:
 
-### IN_REVIEW — En Revisión
-- **Estado inicial:** no
-- **Es terminal:** no
-- **Posición en el flujo:** 3
+| Categoría | Significa | Ejemplos |
+|---|---|---|
+| Nuevo | El ticket acaba de entrar | Abierto, Recibido |
+| En curso | Alguien trabaja en el ticket | En progreso, En revisión, En diagnóstico |
+| En espera | Se espera a un tercero (cliente, proveedor) | Esperando cliente |
+| Cerrado · Resuelto | El ticket terminó con solución | Cerrado, Resuelto |
+| Cerrado · Cancelado | El ticket terminó sin solución | Cancelado, Duplicado |
 
-### CLOSED — Cerrado
-- **Estado inicial:** no
-- **Es terminal:** sí — ninguna transición sale de este estado
-- **Registra:** `resolvedAt` (fecha/hora) y `resolvedBy` (usuario que cerró)
-- **Posición en el flujo:** 4
+Las métricas, los filtros, los contadores del tablero y las reglas de edición siguen la **categoría**, nunca el nombre. Renombrar "Cerrado" a "Finalizado" no cambia nada del comportamiento.
+
+Para "cambiar" la categoría de un estado, crea uno nuevo con la categoría correcta y desactiva el anterior moviendo sus tickets.
+
+## Estado inicial
+
+Todo ticket nuevo empieza en el **estado inicial**: los creados en el portal, los que llegan por correo y los borradores aprobados. Debe ser de categoría Nuevo. Lo eliges con "Hacer inicial".
+
+## Workflow de fábrica
+
+| Estado | Categoría | Avisa al solicitante |
+|---|---|---|
+| Abierto (inicial) | Nuevo | sí |
+| En progreso | En curso | no |
+| En revisión | En curso | no |
+| Cerrado | Cerrado · Resuelto | sí |
+
+Transiciones de fábrica: Abierto → En progreso, Abierto → Cerrado, En progreso → En revisión, En revisión → En progreso y En revisión → Cerrado.
+
+---
+
+## Pantalla "⚙️ Gestión de Workflow"
+
+**Acceso:** "Workflow" en el menú de la izquierda; tiene ayuda "?". **Permiso:** "Gestionar workflow".
+
+### Estados
+
+- **"+ Nuevo estado":** nombre (hasta 50 caracteres, sin repetir), categoría, resultado (solo para Cerrado), descripción y color.
+- **"Editar":** cambia nombre, descripción y color. La categoría y el resultado se muestran bloqueados.
+- **↑ / ↓:** cambia el orden; es el orden de las columnas del tablero y de la línea de tiempo pública.
+- **"Hacer inicial":** en estados activos de categoría Nuevo.
+- **"Desactivar":** pregunta a qué estado mover los tickets que están ahí, los mueve y desactiva el estado. Los movimientos **no envían correo** a los solicitantes y quedan en el historial. El historial conserva el nombre anterior. No se puede desactivar el estado inicial ni el último estado Cerrado · Resuelto.
+- **"Activar":** vuelve a usar un estado inactivo; después habilita sus transiciones.
+
+Los estados nunca se borran.
+
+### Transiciones
+
+Una cuadrícula "Desde ↓ \ Hacia →" con un interruptor por par de estados activos. Cualquier rol con el permiso "Cambiar estado" puede mover un ticket por las transiciones activas, desde el tablero o desde el detalle. **Una transición que sale de un estado Cerrado permite reabrir** tickets cerrados.
+
+### Notificaciones
+
+El interruptor "Avisar al entrar" de un estado decide si el solicitante recibe correo cuando el ticket entra a ese estado. La creación, la asignación y los comentarios tienen sus propios interruptores en Notificaciones; lo que no esté encendido no se envía. Siempre hace falta que el ticket tenga activados los avisos y que el solicitante tenga correo. Por defecto solo avisan los estados Cerrado. Al cerrar, el solicitante recibe un correo distinto si el cierre fue Resuelto o Cancelado.
+
+### Reglas que la pantalla hace cumplir
+
+El banner superior muestra en rojo lo que impide guardar y en ámbar los avisos. La pantalla rechaza los cambios que dejarían:
+
+1. sin estado inicial, o con un inicial que no sea de categoría Nuevo;
+2. sin ningún estado Cerrado · Resuelto activo;
+3. un estado (o el inicial) sin camino posible a un estado Cerrado;
+4. más de 30 estados.
+
+Un estado recién creado y todavía sin conectar solo genera aviso: agrega sus transiciones en el orden que quieras.
 
 ---
 
-## Mapa completo de transiciones
+## En espera pausa la fecha límite
 
-### Transiciones disponibles para Admin (todas)
-
-| Desde | Hacia | Rol requerido | ¿Admin puede? |
-|---|---|---|---|
-| ABIERTO | EN PROGRESO | Sin restricción | ✅ |
-| ABIERTO | CERRADO | **ADMIN** | ✅ Exclusiva de Admin |
-| EN PROGRESO | EN REVISIÓN | Sin restricción | ✅ |
-| EN PROGRESO | ABIERTO | Sin restricción | ✅ |
-| EN REVISIÓN | CERRADO | MANAGER o ADMIN | ✅ |
-| EN REVISIÓN | EN PROGRESO | Sin restricción | ✅ |
-
-**Transiciones no permitidas (para ningún rol):**
-- ABIERTO → EN REVISIÓN ❌
-- EN PROGRESO → CERRADO ❌
-- EN REVISIÓN → ABIERTO ❌
-- CERRADO → cualquier estado ❌ (terminal)
-
-### Transición exclusiva de Admin: ABIERTO → CERRADO
-
-Esta transición permite cerrar un ticket directamente desde su estado inicial sin pasar por EN PROGRESO ni EN REVISIÓN.
-
-**Cuándo usarla:**
-- Tickets duplicados que deben cerrarse sin trabajarse
-- Tickets creados por error
-- Solicitudes que ya fueron resueltas por otro medio antes de que el equipo tomara el ticket
-- Tickets obsoletos que ya no aplican
-
-**Advertencia:** usar esta transición omite el flujo normal de trabajo. Queda registrado en el historial que Admin cerró el ticket directamente desde ABIERTO. Úsala solo cuando sea realmente justificado.
-
----
+Mientras un ticket está en un estado de categoría En espera, su fecha límite está **pausada**: no se marca como vencido y en el tablero aparece "⏸". Al salir de la espera, la fecha límite se recorre los días que esperó y queda registrado como "Fecha límite cambiada". El tiempo en espera no cuenta en el MTTR.
 
 ## Estados especiales
 
-### BORRADOR (Draft — status = NULL)
-
-Los borradores son tickets con campo `status` nulo en la base de datos. No son un estado del enum Status sino una condición especial del modelo Ticket.
-
-**Cómo se crean:**
-- Automáticamente por el sistema de ingesta (ticket-ingestion-light/n8n) cuando procesa correos entrantes
-- Por usuarios o sistemas externos que crean tickets sin activarlos
-
-**Como Admin puedes:**
-- Ver todos los borradores en la sección de Revisión de Borradores
-- Editar cualquier campo del borrador: prioridad, área, categoría, asignado a
-- **Aprobar** → activa el borrador como ticket ABIERTO
-- **Eliminar** → borra permanentemente el borrador (exclusivo de Admin)
-
-**Diferencia con Manager:** el Manager puede aprobar borradores pero no eliminarlos. El Admin puede hacer ambas cosas.
-
-### ARCHIVADO (isArchived = true)
-
-El archivado no es un estado del ticket sino un campo booleano (`isArchived`). Un ticket archivado:
-- Mantiene su estado actual (puede estar CERRADO y archivado simultáneamente)
-- No aparece en las vistas y búsquedas normales
-- Es recuperable si un Admin lo desarchivaera (aunque la UI actual puede no exponer esto)
-- Requiere permiso ARCHIVE_TICKET — exclusivo de Admin
-
-**Cuándo archivar:**
-- Tickets muy antiguos que ya no son relevantes pero deben conservarse por auditoría
-- Limpieza de la lista de trabajo sin eliminar el registro histórico
+- **Borrador:** un ticket sin estado (por ejemplo, un correo pendiente de revisión). Al aprobarlo entra al estado inicial.
+- **Archivado:** no es un estado. Un ticket archivado conserva su estado, desaparece de las vistas y métricas y ya no cambia de estado ni se edita. Se puede archivar un ticket en cualquier estado, también cerrado.
 
 ---
 
-## Configuración del workflow desde Admin
+## Preguntas frecuentes
 
-Como Admin puedes modificar las definiciones de estados y transiciones desde la pantalla de configuración de workflow (requiere permiso MANAGE_WORKFLOW).
+**¿Puedo reabrir un ticket cerrado?**
+Sí, si habilitas una transición que salga del estado Cerrado (por ejemplo, Cerrado → En progreso). Con el workflow de fábrica no hay ninguna.
 
-**Qué puedes configurar por estado:**
-- Nombre visible (`name`)
-- Descripción
-- Color en la interfaz (`color` hex)
-- Si notifica al solicitante al entrar a este estado (`notifyRequester`)
-- Posición de visualización (`position`)
+**¿Qué diferencia hay entre Cancelado y archivado?**
+Cancelado es un cierre (cuenta como cerrado y no entra en el SLA ni en el MTTR). Archivar oculta el ticket de las vistas sin cambiar su estado.
 
-**Qué puedes configurar por transición:**
-- Estado origen y destino
-- Rol requerido para ejecutar la transición (`requiredRole` — puede ser NULL para sin restricción)
-- Descripción de la transición
+**¿Qué pasa con los tickets si desactivo un estado?**
+Se mueven al estado que elijas, sin correo a los solicitantes. Los archivados conservan el estado inactivo.
 
-**Advertencia crítica:** modificar el workflow afecta a todos los tickets activos del sistema. Un cambio incorrecto puede bloquear transiciones en progreso. Realiza cambios en workflow solo si tienes certeza de lo que estás modificando.
-
----
-
-## Preguntas frecuentes para Admin
-
-**¿Puedo cambiar un ticket de CERRADO a cualquier otro estado?**
-No. CERRADO es un estado terminal absoluto. Ningún rol puede revertirlo. Si necesitas reactivar un caso cerrado, crea un ticket nuevo y referencia el anterior en la descripción.
-
-**¿Qué diferencia hay entre archivar y cerrar?**
-Cerrar resuelve el caso formalmente (cambia el estado a CLOSED, registra fecha y usuario). Archivar oculta el ticket de la vista normal sin cambiar su estado — puede archivarse un ticket en cualquier estado, incluso ABIERTO.
-
-**¿Puedo archivar un ticket que está EN PROGRESO?**
-Técnicamente sí, tienes el permiso ARCHIVE_TICKET. Pero hacerlo ocultaría un ticket activo del equipo. Úsalo con precaución.
-
-**¿Cuándo usar ABIERTO → CERRADO?**
-Solo cuando el ticket no requiere trabajo real: duplicados, errores de creación, o casos ya resueltos por otro medio.
-
-**¿Puede un Admin ver todos los estados incluyendo borradores?**
-Sí. Admin tiene visibilidad total: tickets en todos los estados activos y todos los borradores pendientes.
+**¿Cambiar el nombre de un estado afecta las integraciones?**
+No. Cada estado tiene además un código técnico fijo (por ejemplo `OPEN`) que usan las integraciones y que no cambia.

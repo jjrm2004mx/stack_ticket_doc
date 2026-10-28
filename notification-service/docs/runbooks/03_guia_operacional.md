@@ -77,7 +77,7 @@ podman exec notification-db pg_isready -U notif_admin -d notifications_db
 ```bash
 # El servicio debe logear al arrancar que conectó al stream
 podman logs --tail 30 notification-service | grep -i redis
-# Esperado: "Connected to Redis Stream ticket.events"
+# Esperado: "Connected to Redis Stream ticket-events"
 ```
 
 ---
@@ -103,8 +103,8 @@ podman exec -it notification-db psql -U notif_admin -d notifications_db
 
 # Dentro de psql:
 SELECT * FROM notification_logs ORDER BY created_at DESC LIMIT 20;
-SELECT tipo, COUNT(*) FROM notification_logs GROUP BY tipo;
-SELECT * FROM notification_logs WHERE status = 'ERROR' LIMIT 10;
+SELECT event_type, COUNT(*) FROM notification_logs GROUP BY event_type;
+SELECT * FROM notification_logs WHERE status = 'FAILED' LIMIT 10;
 \q
 ```
 
@@ -115,16 +115,16 @@ Para simular un evento, publicar directamente en Redis:
 
 ```bash
 # Publicar evento de prueba en el stream
-podman exec ticket-system-redis redis-cli XADD ticket.events '*' \
-  tipo ticket_created \
-  ticket_id "999" \
-  titulo "Ticket de prueba" \
-  estado "ABIERTO" \
-  solicitante_email "tu@email.com" \
-  solicitante_nombre "Test User" \
-  dominio "IT" \
-  categoria "acceso" \
-  prioridad "MEDIA"
+podman exec ticket-system-redis redis-cli XADD ticket-events '*' \
+  ticketId "a1b2c3d4-e5f6-7890-abcd-ef1234567890" \
+  tenantId "1" \
+  eventType "TICKET_CREATED" \
+  ticketTitle "Ticket de prueba" \
+  ticketFolio "TKT-9999" \
+  requesterEmail "tu@email.com" \
+  requesterName "Test User" \
+  performedByName "Sistema" \
+  notifyRequester "true"
 ```
 
 El servicio debe detectar el evento en segundos y logear el intento de envío.
@@ -141,7 +141,7 @@ El servicio resuelve el proveedor en este orden:
 ```bash
 podman exec -it notification-db psql -U notif_admin -d notifications_db -c \
   "INSERT INTO notification_provider_configs (tenant_id, provider, webhook_url, is_active)
-   VALUES (1, 'WEBHOOK', 'http://til-n8n:5678/webhook/notification-webhook', true);"
+   VALUES (1, 'WEBHOOK', 'http://til-n8n:5678/webhook/send-email', true);"
 ```
 
 **Registrar un tenant con Resend o SendGrid:**
@@ -244,24 +244,24 @@ podman exec notification-db pg_isready -U notif_admin -d notifications_db
 
 ```bash
 # Listar mensajes en el stream
-podman exec ticket-system-redis redis-cli XLEN ticket.events
+podman exec ticket-system-redis redis-cli XLEN ticket-events
 # Debe ser > 0
 
 # Ver los últimos eventos
-podman exec ticket-system-redis redis-cli XREVRANGE ticket.events + - COUNT 5
+podman exec ticket-system-redis redis-cli XREVRANGE ticket-events + - COUNT 5
 ```
 
 **2. Verificar que el consumer group existe:**
 
 ```bash
-podman exec ticket-system-redis redis-cli XINFO GROUPS ticket.events
-# Debe aparecer: notification-service-group
+podman exec ticket-system-redis redis-cli XINFO GROUPS ticket-events
+# Debe aparecer: notification-group
 ```
 
 **3. Ver si hay lag en el consumer group:**
 
 ```bash
-podman exec ticket-system-redis redis-cli XINFO GROUPS ticket.events
+podman exec ticket-system-redis redis-cli XINFO GROUPS ticket-events
 # "pel-count" > 0 significa mensajes pendientes de procesar
 ```
 
@@ -328,8 +328,8 @@ podman exec notification-service env | grep REDIS_HOST
 | Logs en vivo | `podman logs -f notification-service` |
 | Reiniciar servicio | `podman restart notification-service` |
 | Abrir BD | `podman exec -it notification-db psql -U notif_admin -d notifications_db` |
-| Publicar evento prueba | `podman exec ticket-system-redis redis-cli XADD ticket.events '*' tipo ticket_created ...` |
-| Ver consumer lag | `podman exec ticket-system-redis redis-cli XINFO GROUPS ticket.events` |
+| Publicar evento prueba | `podman exec ticket-system-redis redis-cli XADD ticket-events '*' tipo ticket_created ...` |
+| Ver consumer lag | `podman exec ticket-system-redis redis-cli XINFO GROUPS ticket-events` |
 | Prometheus metrics | http://localhost:8081/actuator/prometheus |
 
 ---

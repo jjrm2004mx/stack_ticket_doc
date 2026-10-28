@@ -1,4 +1,5 @@
 # ticket-agent — Resumen Ejecutivo Técnico
+*Corte: Junio 2026*
 
 ## ¿Qué es?
 
@@ -12,7 +13,7 @@ Agente RAG (*Retrieval-Augmented Generation*) del ecosistema de tickets. Respond
 |---|---|
 | **Vector store** | Oracle 23ai — Autonomous AI Database (OCI Always Free) |
 | **Búsqueda** | Hybrid Search: HNSW vectorial + BM25 Oracle Text con RRF |
-| **Embeddings** | ONNX local `mxbai-embed-large-v1` — 1024 dims, FLOAT32 |
+| **Embeddings** | ONNX local `mxbai-embed-large-v1` — 1024 dims, FLOAT32, sin API externa |
 | **Orquestación** | LangGraph StateGraph — pipeline condicional de 6 nodos |
 | **LLM** | OCI GenAI (`cohere.command-r-plus-08-2024`) |
 | **API** | FastAPI REST — puerto 8002 |
@@ -23,7 +24,7 @@ Agente RAG (*Retrieval-Augmented Generation*) del ecosistema de tickets. Respond
 ## Pipeline de inteligencia
 
 ```
-Pregunta + rol
+Pregunta / Error Event + rol
     │
     ▼
 [HyDE]          → LLM genera documento hipotético para mejorar el embedding
@@ -48,14 +49,14 @@ Pregunta + rol
 
 ## Base de conocimiento — Oracle 23ai
 
-| Tabla | Contenido | Chunks |
-|---|---|---|
-| `KB_CHUNKS` | Docs por rol + ayuda contextual UI | 286 |
-| `KB_RUNBOOKS` | Runbooks operacionales de 6 repos | 1,352 |
-| `KB_MANUALS` | Manuales técnicos PDF/DOCX (Docling) | pendiente |
-| `KB_INCIDENTS` | Incidentes históricos | pendiente |
-| `KB_ERROR_CATALOG` | Catálogo errores → Diagnostic Agent | pendiente |
-| `KB_GRAPH_NODES/EDGES` | Property Graph del ecosistema | 25 nodos / 30 aristas |
+| Tabla | Contenido | Estado | Chunks |
+|---|---|---|---|
+| `KB_CHUNKS` | Docs por rol + ayuda contextual UI | ✅ Activa | 286 |
+| `KB_RUNBOOKS` | Runbooks operacionales de 6 repos | ✅ Activa | 1,352 |
+| `KB_MANUALS` | Manuales técnicos PDF/DOCX (Docling) | ⏳ Sin datos | — |
+| `KB_INCIDENTS` | Incidentes históricos PDF/DOCX | ⏳ Sin datos | — |
+| `KB_ERROR_CATALOG` | Catálogo errores → Diagnostic Agent | ⏳ Sin datos | — |
+| `KB_GRAPH_NODES/EDGES` | Property Graph del ecosistema | ✅ Activa | 25 nodos / 30 aristas |
 
 ---
 
@@ -72,21 +73,38 @@ Filtrado **pre-retrieval en SQL** con `JSON_EXISTS` — sin over-fetch en Python
 
 ---
 
-## Fases completadas
+## Estado vs arquitectura objetivo
 
-| Fase | Logro |
+### ✅ Implementado y funcional (80%)
+
+| Componente | Detalle |
 |---|---|
-| ✅ Fase 1 | FAISS + ONNX + OCI GenAI — CLI funcional |
-| ✅ Fase 2 | Oracle 23ai + Parent-Child chunking + Hybrid Search |
-| ✅ Fase 3 | LangGraph: HyDE, Multi-Query RRF, Property Graph, CRAG real |
-| ✅ Fase 4 | FastAPI REST + contenedor Podman + Prometheus + rate limiting |
-| ✅ Fase 5 (parcial) | KB_RUNBOOKS routing — 1,352 runbooks en tabla dedicada, retrieval soporte activo |
+| Parent-Child Chunking | 512 tok hijo / 2048 tok padre |
+| ONNX Embedding local | 1024 dims, FLOAT32, sin API externa |
+| Oracle 23ai Vector Tables | KB_CHUNKS + KB_RUNBOOKS con HNSW + Oracle Text |
+| Property Graph | Mermaid → KB_GRAPH Oracle SQL/PGQ |
+| LangGraph Agentic RAG | HyDE · Multi-Query RRF · CRAG real (DuckDuckGo) |
+| Hybrid Search | HNSW vectorial + BM25 Oracle Text + RRF |
+| Graph Traversal | SQL/PGQ — impacto en cascada entre servicios |
+| Error Event | `POST /api/v1/diagnose` — `ErrorEventRequest` |
+| Diagnostic Agent | DiagnosticState + 5 nodos LangGraph |
+| Remediation Agent | `RemediationOutput` — pasos, verificaciones, estimación |
+
+### ⏳ Pendiente (20%)
+
+| Componente | Motivo |
+|---|---|
+| **KB_MANUALS** | Requiere documentos PDF/DOCX reales — `SOURCE_MANUALES` vacío en `.env` |
+| **KB_INCIDENTS** | Requiere documentos PDF/DOCX reales — `SOURCE_INCIDENTES` vacío en `.env` |
+| **KB_ERROR_CATALOG** | Sin pipeline de ingesta — `lookup_catalog` retorna vacío, afecta calidad del Diagnostic Agent |
+| **Docling en producción** | El loader existe y está validado — bloqueado por falta de documentos fuente |
+| **Context Assembly < 8K tokens** | Fusión de contexto implementada — límite explícito de compresión pendiente |
 
 ---
 
 ## Diferenciadores técnicos
 
-- **Hybrid Search real** — no solo embeddings: combina similitud vectorial HNSW + BM25 keyword con Reciprocal Rank Fusion
+- **Hybrid Search real** — combina similitud vectorial HNSW + BM25 keyword con Reciprocal Rank Fusion
 - **Parent-Child chunking** — recupera fragmentos pequeños (512 tok) pero entrega contexto completo al LLM (2048 tok)
 - **Property Graph Oracle 23ai** — consultas SQL/PGQ sobre relaciones entre servicios del ecosistema
 - **CRAG implementado** — si la confianza local es baja, busca en DuckDuckGo y fusiona al contexto

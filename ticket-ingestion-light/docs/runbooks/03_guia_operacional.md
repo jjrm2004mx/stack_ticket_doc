@@ -1,241 +1,150 @@
 # 03 — Guía Operacional
-## ticket-ingestion-light · Arranque, verificación y troubleshooting
-**Mayo 2026**
+## ticket-ingestion-light · Arranque, verificación, puesta en marcha de n8n y operación diaria
+**Octubre 2026**
+
+Todos los comandos se corren **en Rocky** (`ssh Agente@10.187.21.30`), en
+`~/stack_ticket/ticket-ingestion-light`. La interfaz de n8n se abre desde Windows en
+`http://localhost:5679` con el túnel SSH (infra-monitoring `10_redes_y_acceso_lan.md` §7).
+Comandos sueltos: [operacion.md](operacion.md). Fallas: [troubleshooting.md](troubleshooting.md).
 
 ---
 
 ## Índice
 
-1. [Arranque del stack](#1-arranque-del-stack)
+1. [Arranque y parada](#1-arranque-y-parada)
 2. [Verificación de salud](#2-verificación-de-salud)
-3. [Configurar n8n por primera vez](#3-configurar-n8n-por-primera-vez)
-4. [Operaciones del día a día](#4-operaciones-del-día-a-día)
-5. [Troubleshooting](#5-troubleshooting)
-6. [Referencia rápida](#6-referencia-rápida)
+3. [Estado esperado de los workflows](#3-estado-esperado-de-los-workflows)
+4. [n8n desde cero (volumen nuevo)](#4-n8n-desde-cero-volumen-nuevo)
+5. [Operación diaria](#5-operación-diaria)
+6. [Actualizar n8n o este repo](#6-actualizar-n8n-o-este-repo)
+7. [Respaldo y restauración de n8n_data](#7-respaldo-y-restauración-de-n8n_data)
 
 ---
 
-## 1. Arranque del stack
-
-### Arranque integrado (recomendado)
+## 1. Arranque y parada
 
 ```bash
-# Desde infra-monitoring — levanta todo el ecosistema en orden
-cd ~/stack_ticket/infra-monitoring
-./startup.sh up
-# o equivalente:
-make up
+# Todo el ecosistema, en orden (recomendado tras reiniciar Rocky)
+bash ~/stack_ticket/infra-monitoring/startup.sh up
+
+# Solo este stack (la red ticket-management-network ya debe existir)
+cd ~/stack_ticket/ticket-ingestion-light && ./start.sh
+
+# Parar (el volumen n8n_data se conserva)
+cd ~/stack_ticket/ticket-ingestion-light && podman-compose down
 ```
 
-### Arranque independiente
+`start.sh`: crea `.env` desde `.env.example` si falta, hace `podman-compose down` + `up -d`
+y muestra `podman ps`. n8n escucha solo en `127.0.0.1:5679` de Rocky.
 
-```bash
-cd ~/stack_ticket/ticket-ingestion-light
-./start.sh
-```
-
-`start.sh` hace:
-1. Crea `.env` desde `.env.example` si no existe
-2. Actualiza `POC2_PROCESS_URL` en `.env` (referencia documental)
-3. `podman-compose down` → `podman-compose up -d`
-4. Muestra estado de contenedores
-
-### Parar el stack
-
-```bash
-cd ~/stack_ticket/ticket-ingestion-light
-podman-compose down
-```
+**Nunca** `podman-compose down -v`: borra workflows, credenciales y cursores.
 
 ---
 
 ## 2. Verificación de salud
 
 ```bash
-# Ver estado del contenedor
-podman ps --filter name=til-n8n
-
-# Ver logs en tiempo real
-podman logs --tail 50 til-n8n
-
-# Acceder a la interfaz web de n8n
-# Abrir en Windows: http://localhost:5679
+podman ps --filter name=til-n8n                  # STATUS: Up
+curl -s http://localhost:5679/healthz            # {"status":"ok"}
+podman exec til-n8n n8n list:workflow --active=true   # workflows activos (ver §3)
+podman exec til-n8n wget -qO- http://langchain-agent:8001/health   # n8n alcanza al clasificador
 ```
 
-### Verificar que n8n responde
+`infra-monitoring/health-check.sh` incluye el chequeo de n8n junto con el resto del stack.
 
-```bash
-# Desde WSL
-curl -s http://localhost:5679/healthz
-# Respuesta esperada: {"status":"ok"}
-```
-
-### Verificar que el workflow está activo
-
-En la interfaz web `http://localhost:5679`:
-- Menu izquierdo → **Workflows**
-- El workflow "Gmail → Agente" debe aparecer con estado **Active** (toggle verde)
+El estado de cada canal (última lectura, errores de autorización del buzón) se ve en
+ticket-management: consola `/plataforma` → Clientes → cliente → "Canales de correo", y
+el admin del cliente en "📨 Canales".
 
 ---
 
-## 3. Configurar n8n por primera vez
+## 3. Estado esperado de los workflows
 
-Si el volumen `n8n_data` está vacío o es una instalación nueva:
+Estado en Rocky al 2026-10-17 (decisión del dueño: la ingesta y los avisos de canal
+están **apagados a propósito** mientras se afina el core):
 
-### Paso 1 — Acceder a n8n
-
-```
-http://localhost:5679
-```
-
-Primera vez: n8n pide crear una cuenta de administrador local (usuario + password).
-Esta cuenta solo existe localmente — no es una cuenta en la nube de n8n.
-
-### Paso 2 — Configurar credencial Gmail
-
-1. Menu izquierdo → **Credentials**
-2. **Add Credential** → buscar "Gmail"
-3. Seguir el flujo OAuth:
-   - Necesitas un proyecto en Google Cloud Console con la API de Gmail habilitada
-   - Crear credenciales OAuth 2.0 (tipo: Web Application)
-   - Redirect URI: `http://localhost:5679/rest/oauth2-credential/callback`
-4. Autorizar la cuenta Gmail que recibirá los correos
-
-### Paso 3 — Importar o crear el workflow
-
-**Opción A — Importar desde archivo (si existe backup):**
-1. Menu → **Workflows** → **Import from file**
-2. Seleccionar el archivo `.json` del workflow exportado
-
-**Opción B — Crear desde cero:**
-1. **New Workflow**
-2. Agregar nodo **Gmail Trigger**:
-   - Credencial: la configurada en Paso 2
-   - Evento: `Message Received`
-   - Poll every: `1 minute` (o el intervalo deseado)
-3. Agregar nodo **HTTP Request**:
-   - Method: `POST`
-   - URL: `http://host.containers.internal:8001/process`
-   - Body: JSON con los campos del correo (ver sección de payload en arquitectura técnica)
-4. Conectar nodos → **Save** → **Activate** (toggle)
-
-### Paso 4 — Verificar el flujo
-
-```bash
-# Enviar un correo de prueba a la cuenta Gmail configurada
-# Esperar el intervalo de polling
-# Verificar en n8n: Workflows → Executions (historial de ejecuciones)
-```
-
----
-
-## 4. Operaciones del día a día
-
-### Ver historial de ejecuciones del workflow
-
-En n8n web `http://localhost:5679`:
-- Menu → **Executions**
-- Cada fila es una ejecución del workflow
-- Click en una ejecución para ver los datos de entrada/salida de cada nodo
-
-### Ver si llegó un correo específico
-
-```bash
-# Logs del contenedor muestran la actividad del poller
-podman logs --tail 100 til-n8n | grep -i gmail
-```
-
-### Cambiar la URL del agente
-
-La URL `http://host.containers.internal:8001/process` está hardcodeada en el
-nodo HTTP del workflow dentro de n8n.
-
-Para cambiarla:
-1. `http://localhost:5679` → Workflows → abrir el workflow
-2. Click en el nodo HTTP Request
-3. Cambiar el campo **URL**
-4. Save → el cambio tiene efecto inmediato (sin reiniciar)
-
-### Exportar el workflow (backup)
-
-1. `http://localhost:5679` → Workflows → abrir el workflow
-2. Menu (3 puntos) → **Download** → guarda un `.json`
-3. Guardar el `.json` en un lugar seguro (el volumen puede perderse)
-
-### Pausar el workflow temporalmente
-
-En n8n web: Workflows → toggle del workflow → **Inactive**
-El workflow deja de hacer polling pero el contenedor sigue corriendo.
-
----
-
-## 5. Troubleshooting
-
-### til-n8n no arranca
-
-```bash
-# Ver por qué falló
-podman logs til-n8n
-
-# Causa frecuente: ticket-management-network no existe
-podman network ls | grep ticket-management-network
-# Si no existe:
-podman network create --subnet 10.89.1.0/24 ticket-management-network
-# O levantar con startup.sh que la crea automáticamente
-```
-
-### El workflow no procesa correos
-
-**1. Verificar que el workflow está activo:**
-- `http://localhost:5679` → Workflows → estado debe ser **Active**
-
-**2. Verificar credencial Gmail:**
-- Credentials → Gmail → comprobar que no aparece error de OAuth expirado
-- Si expiró: re-autenticar
-
-**3. Verificar la URL del agente:**
-```bash
-# Desde dentro del contenedor, probar si el agente responde
-podman exec til-n8n wget -qO- http://host.containers.internal:8001/health
-# Debe responder JSON con status ok
-```
-
-**4. Revisar ejecuciones fallidas:**
-- n8n web → Executions → buscar ejecuciones con estado Error
-- Click en la ejecución roja para ver el error exacto
-
-### Error de red al llegar al agente
-
-```bash
-# Verificar que langchain-agent está corriendo
-podman ps | grep langchain-agent
-
-# Verificar puertos
-podman port langchain-agent
-# Debe mostrar: 8001/tcp -> 0.0.0.0:8001
-```
-
-### Workflow perdido (volumen recreado)
-
-Si el volumen `n8n_data` fue eliminado, n8n arranca sin workflows ni credenciales.
-Volver al [Paso 3 — Importar o crear el workflow](#paso-3--importar-o-crear-el-workflow).
-
-Lección: exportar el workflow como `.json` periódicamente como backup.
-
----
-
-## 6. Referencia rápida
-
-| Acción | Comando / URL |
+| Workflow | Estado esperado |
 |---|---|
-| Arrancar stack | `./start.sh` |
-| Parar stack | `podman-compose down` |
-| Logs en vivo | `podman logs -f til-n8n` |
-| Interfaz n8n | http://localhost:5679 |
-| Health check | `curl http://localhost:5679/healthz` |
-| Ver ejecuciones | http://localhost:5679 → Executions |
-| Reiniciar contenedor | `podman restart til-n8n` |
+| `Clasificador de tickets notification` (`send-email`) | **Activo** |
+| `Canal cliente-inicial / Shared Services — ingesta` | Inactivo (se activa cuando el dueño lo decida) |
+| `Canal cliente-inicial / Shared Services — errores` | Inactivo |
+| `Canal cliente-inicial / Shared Services — envío` | Inactivo (su fila en `notification_provider_configs` también está inactiva) |
+| `SS- …`, `SSS- …`, `POC2 - …` (viejos) | Inactivos siempre |
+
+Mientras el envío del canal esté inactivo, los avisos de tickets de ese canal **no se
+mandan** (fallan cerrados en notification-service). Los correos de cuenta y contraseña sí
+salen por `send-email`.
+
+Para encender un canal: activar primero errores y envío, luego ingesta, y activar su fila
+de proveedor en notification-service ([05_alta_y_baja_de_buzon.md](05_alta_y_baja_de_buzon.md)).
 
 ---
 
-*ticket-ingestion-light · Guía Operacional · Mayo 2026*
+## 4. n8n desde cero (volumen nuevo)
+
+Si `n8n_data` se perdió y no hay respaldo (si lo hay, ver §7):
+
+1. Abrir `http://localhost:5679` y crear la cuenta de administrador local de n8n.
+2. **Credencial de Graph**: Credentials → nueva credencial de tipo Microsoft Entra
+   (service principal) `HITSS - Shared Services - Outlook AppOnly` con tenant, client id y
+   secreto de la app de Azure de HITSS (permisos de aplicación para leer y enviar correo).
+3. **Notificación de plataforma**: importar `n8n/workflows/2026-10-15-notificacion-microsoft-graph.json`,
+   asignar la credencial al nodo "Send Email - Microsoft Graph" y activarlo.
+4. **Cada canal**: seguir el alta de [05_alta_y_baja_de_buzon.md](05_alta_y_baja_de_buzon.md)
+   (credenciales de cabecera, 3 copias desde las plantillas). La llave del canal no se puede
+   recuperar: hay que **rotarla** en la consola y usar la nueva.
+5. La ingesta empezará desde el kickoff de cada canal; el clasificador descarta lo que ya
+   tenía (responde `200`), así que no se duplican tickets.
+
+---
+
+## 5. Operación diaria
+
+| Tarea | Cómo |
+|---|---|
+| Ver ejecuciones | n8n → Executions (filtrar por workflow; rojo = error, clic para ver el nodo que falló) |
+| Pausar un canal | Desactivar su copia "— ingesta" (el cursor se conserva; al reactivar carga lo pendiente) |
+| Mover el inicio de lectura | Consola de plataforma → canal → "Cambiar fecha" (kickoff). La siguiente corrida empieza en esa fecha |
+| Rotar la llave de un canal | Consola → "Rotar llave" → actualizar la credencial `Canal … — X-Channel-Key` en n8n. Mientras no se actualice, la ingesta falla con `401` y se reporta como error del canal |
+| Alta / baja de buzón | [05_alta_y_baja_de_buzon.md](05_alta_y_baja_de_buzon.md) |
+| Cambiar una plantilla | Editar el JSON en `n8n/workflows/templates/`, PR, y **reimportar a mano** cada copia existente (los cambios no se propagan solos) |
+| Exportar un workflow | `podman exec til-n8n n8n export:workflow --id=<id> --output=/tmp/wf.json` y `podman cp til-n8n:/tmp/wf.json .` (las copias de canal no se versionan) |
+
+---
+
+## 6. Actualizar n8n o este repo
+
+```bash
+cd ~/stack_ticket/ticket-ingestion-light
+git pull                                  # Rocky sigue origin/develop
+podman pull docker.io/n8nio/n8n           # solo si se quiere una imagen nueva
+podman-compose up -d --force-recreate     # sin --force-recreate no siempre se recrea
+curl -s http://localhost:5679/healthz
+```
+
+La imagen no tiene versión fija: una versión nueva de n8n puede cambiar valores por
+defecto de los nodos. Respaldar `n8n_data` antes (§7) y revisar Executions después.
+
+---
+
+## 7. Respaldo y restauración de n8n_data
+
+```bash
+# Respaldo (con n8n parado para que el SQLite quede consistente)
+cd ~/stack_ticket/ticket-ingestion-light && podman-compose down
+podman volume export ticket-ingestion-light_n8n_data --output ~/respaldos/n8n_data_$(date +%F).tar
+./start.sh
+
+# Restauración
+podman-compose down
+podman volume import ticket-ingestion-light_n8n_data ~/respaldos/n8n_data_<fecha>.tar
+./start.sh
+```
+
+El respaldo contiene las credenciales de Graph y las llaves de los canales: guardarlo
+solo en Rocky (`~/respaldos/`), nunca en git. El respaldo integral del ecosistema (las 3
+bases PostgreSQL + `n8n_data`) se describe en infra-monitoring.
+
+---
+
+*ticket-ingestion-light · Guía Operacional · Octubre 2026*

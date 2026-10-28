@@ -7,7 +7,7 @@ Documentación de la API REST expuesta por `src/api/`.
 ## Arranque
 
 ```bash
-cd ~/stack_ticket/ticket-agent
+cd ~/stack_agent/ticket-agent
 source .venv/bin/activate
 uvicorn src.api.main:app --port 8002 --reload
 ```
@@ -176,7 +176,7 @@ directamente — no usar el comando uvicorn manual en producción.
 
 ```bash
 # Levantar el contenedor (recomendado)
-bash ~/stack_ticket/ticket-agent/startup.sh up
+bash ~/stack_agent/ticket-agent/startup.sh up
 
 # Health check
 curl http://localhost:8002/api/v1/health

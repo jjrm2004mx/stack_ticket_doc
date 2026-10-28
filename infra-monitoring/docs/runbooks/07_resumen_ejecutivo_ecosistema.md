@@ -10,7 +10,7 @@ El sistema automatiza el ciclo de vida completo de tickets de soporte, desde la 
 
 ### 1. Ticket Ingestion Light — Puerta de entrada
 
-Monitorea una bandeja de Gmail y, en cuanto llega un correo, lo captura y reenvía automáticamente al clasificador. No toma ninguna decisión: su único trabajo es detectar el correo y disparar el proceso.
+Lee los buzones de Outlook de cada cliente (un canal por buzón, con Microsoft Graph y sin modificarlos) y entrega cada correo nuevo a la bandeja del clasificador. También envía, desde el buzón del canal, los avisos que le pide notification-service. No toma ninguna decisión sobre los tickets.
 
 ### 2. Ticket Classification — Cerebro de entrada
 

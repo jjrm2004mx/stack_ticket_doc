@@ -65,11 +65,14 @@ cp .env.example .env
 Editar `.env` según el entorno:
 
 ```bash
-# Local (WSL) — rutas relativas desde ~/stack_ticket/ticket-agent/
+# Local (WSL) — rutas relativas desde ~/stack_agent/ticket-agent/
 SOURCE_USUARIOS=../ticket-management/docs/usuarios
 SOURCE_RUNBOOKS=../ticket-management/docs/runbooks,...
 SOURCE_HELP_TS=../ticket-management/frontend/src/components/help/helpContent.ts
 OLLAMA_BASE_URL=http://localhost:11434
+
+# Rocky (agente en ~/stack_agent, hermanos en ~/stack_ticket): rutas completas en
+# 03_guia_operacional.md, "Re-ingesta — Documentos" → "Rutas de las fuentes en Rocky"
 
 # Pre/Producción — ajustar al path real de instalación
 SOURCE_USUARIOS=/opt/stack_ticket/ticket-management/docs/usuarios
@@ -133,26 +136,21 @@ cd ~/stack_ticket/ticket-classification && git pull
 # ... etc
 ```
 
-### Paso 2 — Activar el entorno virtual
+### Paso 2 — Re-ingestar (Rocky)
 
 ```bash
-cd ~/stack_ticket/ticket-agent
-source .venv/bin/activate
+cd ~/stack_agent/ticket-agent && git pull
+bash reingesta.sh revisar
+bash reingesta.sh ingerir
 ```
 
-### Paso 3 — Re-ingestar
+> **Siempre `all`.** Manuales de usuario y ayudas comparten la tabla `KB_CHUNKS`, y la
+> ingesta vacía cada tabla destino antes de llenarla: `--source usuarios` borraría las ayudas
+> y `--source help` los manuales. Las fuentes `manuales` e `incidentes` (tablas propias) sí se
+> pueden ingerir por separado.
 
-```bash
-# Re-ingestar todo (recomendado para asegurar consistencia)
-python -m src.main ingest --source all
 
-# O solo la fuente modificada (más rápido, pero el índice quedará solo con esa fuente)
-python -m src.main ingest --source usuarios   # si cambiaron docs/usuarios/
-python -m src.main ingest --source runbooks   # si cambiaron docs/runbooks/
-python -m src.main ingest --source help       # si cambió helpContent.ts
-```
-
-### Paso 4 — Verificar
+### Paso 3 — Verificar
 
 ```bash
 python -m src.main query --query "¿Cómo creo un ticket?" --rol usuario
@@ -209,7 +207,7 @@ pytest tests/ -k "not onnx_embedder_dims and not onnx_embed_documents"
 El virtualenv no persiste entre sesiones de terminal:
 
 ```bash
-cd ~/stack_ticket/ticket-agent   # o el path correspondiente
+cd ~/stack_agent/ticket-agent   # o el path correspondiente
 source .venv/bin/activate
 ```
 

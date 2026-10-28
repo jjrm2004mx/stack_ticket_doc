@@ -21,12 +21,7 @@ Cambiar el estado es la acción más frecuente de un Manager. Controla el progre
 3. Selecciona el nuevo estado válido
 4. Confirma el cambio
 
-**Transiciones válidas para Manager:**
-- ABIERTO → EN PROGRESO
-- EN PROGRESO → EN REVISIÓN
-- EN PROGRESO → ABIERTO (regresión)
-- EN REVISIÓN → CERRADO ← única forma de cerrar un ticket como Manager
-- EN REVISIÓN → EN PROGRESO (si hay problemas)
+**Transiciones válidas:** las que configuró tu organización en el workflow; el menú "Estado" del detalle ofrece cada estado al que se puede pasar desde el estado actual. Con el workflow de fábrica: Abierto → En progreso, Abierto → Cerrado, En progreso → En revisión, En revisión → En progreso y En revisión → Cerrado. Un ticket cerrado se reabre solo si la organización habilitó una transición que salga del estado Cerrado.
 
 **Qué registra el sistema:** cada cambio de estado queda en el historial con tu nombre y la fecha/hora exacta.
 
@@ -42,9 +37,10 @@ Cambiar el estado es la acción más frecuente de un Manager. Controla el progre
 3. Guarda el cambio
 
 **Notas:**
-- Puedes reasignar un ticket en cualquier estado excepto CERRADO
+- Puedes reasignar un ticket en cualquier estado, también cerrado
 - Al asignar, el campo `assignedTo` del ticket se actualiza con el UUID del usuario seleccionado
 - La asignación queda registrada en el historial de eventos
+- Si el Admin configuró reglas de asignación por área y categoría, los correos que entran activos ya llegan asignados (en el historial: "⚙ Asignado automáticamente"); puedes reasignarlos igual. Al aprobar un borrador o crear un ticket, "Asignar a" viene propuesto con la persona de la regla
 
 ---
 
@@ -56,8 +52,8 @@ Como Manager puedes modificar los campos de un ticket existente.
 - Título (máximo 255 caracteres)
 - Descripción (máximo 10,000 caracteres)
 - Prioridad (Baja / Media / Alta / Crítica)
-- Tipo (Tarea / Bug / Feature / Documentación)
-- Fecha límite
+- Fecha límite (o quitarla)
+- Solicitante: nombre, correo, casilla "Enviar notificaciones al solicitante" y medio
 - Horas estimadas
 - Área y categoría
 - Asignado a
@@ -68,7 +64,7 @@ Como Manager puedes modificar los campos de un ticket existente.
 3. Realiza los cambios
 4. Guarda
 
-**Restricción:** no puedes editar tickets en estado CERRADO.
+**Restricción:** no puedes editar tickets en un estado de categoría Cerrado.
 
 ---
 
@@ -78,7 +74,7 @@ Como Manager tienes control total sobre los adjuntos de un ticket.
 
 ### Ver y descargar adjuntos
 1. Abre el detalle del ticket
-2. Ve a la sección **"Adjuntos"** o usa el botón de clip
+2. Usa **"Adjuntos"** en el encabezado del detalle (o "Ver todos" de su sección de adjuntos)
 3. Verás la lista de archivos con nombre, tamaño y quién los subió
 4. Haz clic en un archivo para descargarlo o visualizarlo
 
@@ -123,7 +119,7 @@ El historial muestra un registro completo y auditable de todo lo que ocurrió co
 **Qué incluye el historial:**
 - Cambios de estado (de quién a quién, fecha y hora)
 - Cambios de asignación
-- Modificaciones de campos (prioridad, título, etc.)
+- Modificaciones de campos (prioridad, fecha límite, solicitante, área y categoría)
 - Comentarios agregados
 - Adjuntos subidos o eliminados
 
@@ -150,7 +146,7 @@ Los borradores son tickets que llegaron al sistema (normalmente desde correo ele
 **Qué puedes hacer con un borrador:**
 - Ver el contenido original (incluyendo el email HTML si llegó por correo)
 - Editar: prioridad, área, categoría y asignado a
-- **Aprobar** el borrador → se convierte en ticket ABIERTO y entra al flujo normal
+- **Aprobar** el borrador → entra al estado inicial de la organización y al flujo normal
 
 **Cuándo existe un borrador:** cuando el sistema de ingesta automática (ticket-ingestion-light/n8n) procesa un correo entrante y lo crea como borrador para revisión humana.
 
@@ -158,7 +154,7 @@ Los borradores son tickets que llegaron al sistema (normalmente desde correo ele
 1. Abre el borrador
 2. Revisa y ajusta área, categoría, prioridad y asignación
 3. Haz clic en **"Aprobar"**
-4. El ticket pasa a estado ABIERTO y es visible en el flujo normal
+4. El ticket pasa al estado inicial y es visible en el flujo normal
 
 **Nota:** no puedes eliminar borradores — esa acción es exclusiva de Admin.
 
@@ -171,7 +167,7 @@ El dashboard muestra estadísticas del estado del equipo.
 **Cómo acceder:** en el menú principal busca **"Dashboard"** o el ícono de métricas.
 
 **Qué puedes ver:**
-- Total de tickets por estado (Abiertos, En Progreso, En Revisión, Cerrados)
+- Tickets abiertos, cerrados (y cuántos se cancelaron), en curso y en espera
 - Tickets por prioridad
 - Tickets asignados a cada miembro del equipo
 - Tickets creados en un período de tiempo
@@ -186,8 +182,7 @@ El dashboard muestra estadísticas del estado del equipo.
 | Ver todos los tickets | ✅ |
 | Crear tickets | ✅ |
 | Editar tickets | ✅ |
-| Cambiar estado (excepto ABIERTO→CERRADO) | ✅ |
-| Cerrar tickets (desde EN REVISIÓN) | ✅ |
+| Cambiar estado (transiciones configuradas) | ✅ |
 | Agregar comentarios | ✅ |
 | Ver adjuntos | ✅ |
 | Subir adjuntos | ✅ |
@@ -200,7 +195,6 @@ El dashboard muestra estadísticas del estado del equipo.
 | Gestionar usuarios | ❌ — solo Admin |
 | Gestionar áreas y categorías | ❌ — solo Admin |
 | Configurar workflow | ❌ — solo Admin |
-| Cerrar ticket desde ABIERTO directamente | ❌ — solo Admin |
 
 ---
 
@@ -217,6 +211,9 @@ El sistema rechazará la carga y mostrará un mensaje de error. Debes comprimir 
 
 **¿Puedo ver los borradores si no me los asignaron?**
 Sí. Todos los Managers ven todos los borradores pendientes.
+
+**¿Cómo cambio o recupero mi contraseña?**
+Para cambiarla: clic en tu nombre o tus iniciales, arriba a la derecha → **"Cambiar contraseña"** (mínimo 12 caracteres; tus otros dispositivos cierran sesión). Si la olvidaste: **"¿Olvidaste tu contraseña?"** en el inicio de sesión, o pide a tu administrador que te envíe el enlace. Después de 5 intentos fallidos en 15 minutos la cuenta se bloquea 15 minutos.
 
 **¿Cuándo debo usar "EN REVISIÓN" vs cerrar directamente?**
 Usa EN REVISIÓN cuando quieras que alguien (el solicitante u otro Manager) confirme que el problema fue resuelto antes del cierre formal. Si estás seguro de que está resuelto, puedes cerrar directamente desde EN REVISIÓN.

@@ -7,158 +7,139 @@ fuente: ticket-management
 
 # Permisos — Admin
 
-El Admin tiene acceso total al sistema. Este documento detalla la matriz completa de permisos, qué puede modificar y qué está bloqueado por el propio sistema.
+La pantalla **🔐 Gestión de Permisos** define qué puede hacer cada rol en tu organización. Solo el rol Admin puede abrirla y editarla. Este documento explica cómo está organizada, qué valores trae por defecto y qué reglas son fijas.
 
 ---
 
-## Matriz completa de permisos — Admin
+## Cómo está organizada la pantalla
 
-| Permiso | Admin | Manager | Usuario | Modificable por Admin |
+Las acciones están agrupadas por la parte del portal que controlan. Cada grupo tiene un título y una explicación corta; debajo están sus acciones con las columnas **👤 Usuario**, **👔 Manager** y **🔑 Admin**.
+
+### 🎫 Acceso a tickets — qué tickets puede ver y crear el rol
+
+| Acción | Qué permite | Usuario | Manager | Admin |
 |---|---|---|---|---|
-| VIEW_TICKETS | ✅ Fijo | ✅ Fijo | ✅ Fijo | ❌ Siempre activo para todos |
-| CREATE_TICKET | ✅ | ✅ (default) | ✅ (default) | ✅ Para Manager y Usuario |
-| EDIT_TICKET | ✅ | ✅ (default) | ❌ (default) | ✅ Para Manager y Usuario |
-| CHANGE_STATUS | ✅ | ✅ (default) | ❌ (default) | ✅ Para Manager y Usuario |
-| ARCHIVE_TICKET | ✅ Fijo | ❌ No disponible | ❌ No disponible | ❌ Exclusivo Admin |
-| ADD_COMMENT | ✅ | ✅ (default) | ✅ (default) | ✅ Para Manager y Usuario |
-| VIEW_ATTACHMENTS | ✅ | ✅ (default) | ✅ (default) | ✅ Para Manager y Usuario |
-| UPLOAD_ATTACHMENT | ✅ | ✅ (default) | ❌ (default) | ✅ Para Manager y Usuario |
-| DELETE_ATTACHMENT | ✅ | ✅ (default) | ❌ (default) | ✅ Para Manager y Usuario |
-| VIEW_TICKET_EVENTS | ✅ | ✅ (default) | ❌ (default) | ✅ Para Manager y Usuario |
-| VIEW_DASHBOARD | ✅ | ✅ (default) | ❌ (default) | ✅ Para Manager y Usuario |
-| MANAGE_USERS | ✅ Fijo | ❌ No disponible | ❌ No disponible | ❌ Exclusivo Admin |
-| REVIEW_DRAFTS | ✅ | ✅ (default) | ❌ (default) | ✅ Para Manager y Usuario |
-| MANAGE_CLASSIFICATIONS | ✅ Fijo | ❌ No disponible | ❌ No disponible | ❌ Exclusivo Admin |
-| MANAGE_WORKFLOW | ✅ Fijo | ❌ No disponible | ❌ No disponible | ❌ Exclusivo Admin |
+| Ver tickets (VIEW_TICKETS) | Abrir el tablero, la lista y el detalle de los tickets que le corresponden | ✅ Fijo | ✅ Fijo | ✅ Fijo |
+| Ver tickets sin asignar (VIEW_UNASSIGNED_TICKETS) | Ver también los tickets que aún no tienen responsable | ❌ | ✅ | ✅ Fijo |
+| Ver todos los tickets (VIEW_ALL_TICKETS) | Ver todos los tickets de la organización, no solo los asignados al usuario | ❌ | ✅ | ✅ Fijo |
+| Crear tickets (CREATE_TICKET) | Botón «+ Nuevo ticket» | ✅ | ✅ | ✅ Fijo |
+
+### 🧾 Trabajo en el ticket — acciones dentro del detalle de un ticket
+
+| Acción | Qué permite | Usuario | Manager | Admin |
+|---|---|---|---|---|
+| Editar tickets (EDIT_TICKET) | Cambiar título, descripción, prioridad, área y categoría, fecha límite y datos del solicitante | ❌ | ✅ | ✅ Fijo |
+| Asignar tickets (ASSIGN_TICKET) | Elegir o quitar al responsable (incluye «Asignar a» al crear y al aprobar un borrador) | ❌ | ✅ | ✅ Fijo |
+| Cambiar estado (CHANGE_STATUS) | Mover el ticket entre estados, desde el detalle o arrastrando en el tablero | ❌ | ✅ | ✅ Fijo |
+| Agregar comentarios (ADD_COMMENT) | Escribir y editar comentarios | ✅ | ✅ | ✅ Fijo |
+| Archivar tickets (ARCHIVE_TICKET) | Ocultar un ticket de las vistas (también cerrados) | 🔒 Solo Admin | 🔒 Solo Admin | ✅ Fijo |
+
+### 📎 Adjuntos e historial — archivos del ticket y registro de lo que pasó
+
+| Acción | Qué permite | Usuario | Manager | Admin |
+|---|---|---|---|---|
+| Ver adjuntos (VIEW_ATTACHMENTS) | Ver y descargar archivos | ✅ | ✅ | ✅ Fijo |
+| Subir adjuntos (UPLOAD_ATTACHMENT) | Agregar archivos a un ticket | ❌ | ✅ | ✅ Fijo |
+| Eliminar adjuntos (DELETE_ATTACHMENT) | Borrar archivos de un ticket | ❌ | ✅ | ✅ Fijo |
+| Ver historial de eventos (VIEW_TICKET_EVENTS) | Ver quién hizo qué y cuándo en el ticket | ❌ | ✅ | ✅ Fijo |
+
+### 📋 Bandeja de revisión — tickets que llegan por correo y esperan revisión
+
+| Acción | Qué permite | Usuario | Manager | Admin |
+|---|---|---|---|---|
+| Revisar borradores (REVIEW_DRAFTS) | Abrir la Bandeja de revisión y aprobar borradores | ❌ | ✅ | ✅ Opcional |
+
+### 📊 Métricas y asistente
+
+| Acción | Qué permite | Usuario | Manager | Admin |
+|---|---|---|---|---|
+| Ver dashboard de métricas (VIEW_DASHBOARD) | Vista «Métricas» con KPIs, gráficas y rendimiento por agente | ❌ | ✅ | ✅ Fijo |
+| Usar asistente (USE_AGENT) | Widget del asistente con respuestas de la documentación | ✅ | ✅ | ✅ Fijo |
+
+### ⚙️ Administración — configuración de la organización
+
+| Acción | Qué permite | Usuario | Manager | Admin |
+|---|---|---|---|---|
+| Gestionar usuarios (MANAGE_USERS) | Invitar y desactivar usuarios | 🔒 Solo Admin | 🔒 Solo Admin | ✅ Fijo |
+| Gestionar áreas y categorías (MANAGE_CLASSIFICATIONS) | Crear, editar y desactivar áreas y categorías, y exportar la revisión del clasificador | 🔒 Solo Admin | 🔒 Solo Admin | ✅ Opcional |
+| Gestionar workflow (MANAGE_WORKFLOW) | Estados, transiciones y notificaciones | 🔒 Solo Admin | 🔒 Solo Admin | ✅ Opcional |
+| Gestionar permisos | Editar esta matriz | — | — | ✅ Siempre |
+
+Los valores de Usuario y Manager son los que trae una organización nueva; tú puedes cambiarlos. "Gestionar permisos" es una fila informativa: la regla la aplica el sistema por rol y no se guarda en la matriz.
 
 ---
 
-## Reglas fijas del sistema (no modificables)
+## Reglas fijas del sistema
 
-Estas reglas están hardcodeadas en la lógica del sistema y ningún Admin puede cambiarlas:
+Estas reglas no se pueden cambiar desde la pantalla. Las casillas fijas se ven con borde punteado y muestran su valor real.
 
-### Siempre TRUE para todos los roles
-- **VIEW_TICKETS** — todos los usuarios pueden ver tickets, sin excepción
+- **Ver tickets** está siempre activo para todos los roles.
+- **Solo Admin:** Archivar tickets, Gestionar usuarios, Gestionar áreas y categorías y Gestionar workflow no se pueden dar a Usuario ni a Manager.
+- **Admin tiene fijas** todas las acciones excepto tres opcionales: Revisar borradores, Gestionar áreas y categorías y Gestionar workflow.
+- **Gestionar permisos** es solo del rol Admin.
 
-### Exclusivos de Admin (no transferibles)
-- **ARCHIVE_TICKET** — ningún rol diferente a Admin puede archivar
-- **MANAGE_USERS** — la gestión de usuarios es exclusiva de Admin
-- **MANAGE_CLASSIFICATIONS** — solo Admin gestiona el catálogo de áreas y categorías
-- **MANAGE_WORKFLOW** — solo Admin configura estados y transiciones
-
-### Opcionales para Admin (Admin puede activarlos/desactivarlos sobre sí mismo)
-- REVIEW_DRAFTS — activo por defecto para Admin, pero configurable
-- otros permisos del Admin que no sean los 4 exclusivos arriba
+> **Precaución:** si quitas a Admin «Gestionar áreas y categorías» o «Gestionar workflow», nadie podrá abrir esas pantallas hasta que lo vuelvas a activar aquí.
 
 ---
 
-## Cómo modificar permisos de otros roles
+## Asignar es independiente de editar
 
-**Desde la pantalla Gestión de Permisos:**
+**Asignar tickets** es una acción propia, separada de **Editar tickets**:
 
-1. Accede a **Gestión de Permisos** desde el menú
-2. Verás la matriz completa con las filas: `(rol, acción, permitido)`
-3. Cambia el valor de `allowed` para el par (rol, acción) que necesitas
-4. Guarda — el cambio queda registrado con tu usuario y la fecha
+- Con **Asignar tickets**, el rol ve los selectores **"Asignado a"** (detalle), **"Asignar a"** (Nuevo ticket) y **"Asignar a"** (Bandeja de revisión). Los selectores solo ofrecen usuarios activos de tu organización; el responsable actual sigue apareciendo aunque ya no esté activo.
+- Sin **Asignar tickets**, el detalle muestra el responsable sin selector, Nuevo ticket no tiene "Asignar a" y los borradores se aprueban sin responsable.
+- Un rol puede tener una sin la otra. Por ejemplo, un Manager con "Asignar tickets" y sin "Editar tickets" puede repartir el trabajo pero no cambiar prioridad, área ni categoría.
 
-**Ejemplo:** para permitir que los Usuarios puedan subir adjuntos:
-- Busca la fila `(MANAGER=false)` de la acción UPLOAD_ATTACHMENT para el rol USER
-- Cambia a `true`
-- Guarda
-
-**Impacto:** el cambio aplica a TODOS los usuarios de ese rol desde su próxima sesión.
+Al separar las dos acciones, cada rol conservó en "Asignar tickets" el mismo valor que tenía en "Editar tickets", así que nadie ganó ni perdió la capacidad de asignar. Revisa ambas al delegar trabajo.
 
 ---
 
-## Permisos por rol — Configuración por defecto del sistema
+## Cómo modificar permisos
 
-### ROL: USER (Usuario)
-```
-VIEW_TICKETS:         TRUE  (fijo)
-CREATE_TICKET:        TRUE
-EDIT_TICKET:          FALSE
-CHANGE_STATUS:        FALSE
-ARCHIVE_TICKET:       FALSE (no disponible)
-ADD_COMMENT:          TRUE
-VIEW_ATTACHMENTS:     TRUE
-UPLOAD_ATTACHMENT:    FALSE
-DELETE_ATTACHMENT:    FALSE
-MANAGE_USERS:         FALSE (no disponible)
-VIEW_TICKET_EVENTS:   FALSE
-VIEW_DASHBOARD:       FALSE
-REVIEW_DRAFTS:        FALSE
-MANAGE_CLASSIFICATIONS: FALSE (no disponible)
-MANAGE_WORKFLOW:      FALSE (no disponible)
-```
+1. Abre **Permisos** en el menú de la izquierda (solo administradores).
+2. Busca la acción en su grupo y activa o desactiva el interruptor del rol.
+3. Presiona **Guardar cambios**. Si sales sin guardar, los cambios se pierden. Si el guardado falla verás "No se pudieron guardar los cambios" con el motivo.
 
-### ROL: MANAGER
-```
-VIEW_TICKETS:         TRUE  (fijo)
-CREATE_TICKET:        TRUE
-EDIT_TICKET:          TRUE
-CHANGE_STATUS:        TRUE
-ARCHIVE_TICKET:       FALSE (no disponible)
-ADD_COMMENT:          TRUE
-VIEW_ATTACHMENTS:     TRUE
-UPLOAD_ATTACHMENT:    TRUE
-DELETE_ATTACHMENT:    TRUE
-MANAGE_USERS:         FALSE (no disponible)
-VIEW_TICKET_EVENTS:   TRUE
-VIEW_DASHBOARD:       TRUE
-REVIEW_DRAFTS:        TRUE
-MANAGE_CLASSIFICATIONS: FALSE (no disponible)
-MANAGE_WORKFLOW:      FALSE (no disponible)
-```
+**Ejemplo:** para que los Usuarios puedan subir adjuntos, activa "Subir adjuntos" en la columna Usuario del grupo Adjuntos e historial y guarda.
 
-### ROL: ADMIN
-```
-Todos los permisos: TRUE
-```
+**Cuándo aplica:** el servidor aplica la matriz en cuanto guardas; quien intente una acción que ya no tiene recibe "No tienes permiso para esta acción". Los botones y pantallas de los demás usuarios se actualizan la próxima vez que recarguen el portal o inicien sesión.
 
 ---
 
-## Restricciones de transición de estado por rol
+## Cambios de estado y permisos
 
-El permiso CHANGE_STATUS es necesario pero no suficiente. El sistema valida adicionalmente las reglas del workflow para cada transición:
-
-| Transición | Usuario | Manager | Admin |
-|---|---|---|---|
-| ABIERTO → EN PROGRESO | ❌ sin CHANGE_STATUS | ✅ | ✅ |
-| ABIERTO → CERRADO | ❌ | ❌ restricción workflow | ✅ exclusivo Admin |
-| EN PROGRESO → EN REVISIÓN | ❌ | ✅ | ✅ |
-| EN PROGRESO → ABIERTO | ❌ | ✅ | ✅ |
-| EN REVISIÓN → CERRADO | ❌ | ✅ | ✅ |
-| EN REVISIÓN → EN PROGRESO | ❌ | ✅ | ✅ |
+Para cambiar el estado de un ticket hace falta el permiso CHANGE_STATUS ("Cambiar estado") y que exista una transición habilitada desde el estado actual en "⚙️ Gestión de Workflow". Las transiciones no tienen restricciones por rol: cualquier rol con el permiso puede usar cualquier transición activa. De fábrica, Manager y Admin tienen el permiso y Usuario no.
 
 ---
 
-## Auditoría de cambios en permisos
+## Registro de cambios en permisos
 
-Cada modificación a la matriz de permisos queda registrada:
-- **updatedBy**: usuario Admin que realizó el cambio
-- **timestamp**: fecha y hora del cambio
-- **qué cambió**: acción, rol, valor anterior, valor nuevo
-
-Esto garantiza trazabilidad completa de quién modificó los permisos del sistema y cuándo.
+Cada casilla guarda quién la cambió por última vez y cuándo. No se conserva el historial de valores anteriores.
 
 ---
 
 ## Preguntas frecuentes sobre permisos
 
 **¿Puedo darle a un Manager el permiso de archivar tickets?**
-No. ARCHIVE_TICKET es exclusivo de Admin por diseño del sistema y no puede asignarse a otro rol.
+No. Archivar tickets es exclusivo de Admin y no puede asignarse a otro rol.
+
+**¿Se pueden archivar tickets cerrados?**
+Sí. "🗄 Archivar ticket" aparece en el detalle en cualquier estado, incluido Cerrado.
+
+**¿Puedo delegar la edición de permisos a un Manager?**
+No. La fila "Gestionar permisos" muestra que solo Admin puede editar esta matriz.
 
 **¿Puedo quitarle a un Manager el permiso de cambiar estados?**
-Sí. CHANGE_STATUS es configurable por Admin para el rol Manager. Si lo desactivas, los Managers no podrán ejecutar ninguna transición de estado.
+Sí. Si lo desactivas, los Managers no podrán ejecutar ninguna transición de estado.
 
-**¿Qué pasa si desactivo CREATE_TICKET para el rol Usuario?**
-Los usuarios no podrán crear nuevos tickets desde la interfaz. Seguirán pudiendo ver y comentar en tickets existentes.
+**¿Qué pasa si desactivo "Crear tickets" para el rol Usuario?**
+Los usuarios no verán "+ Nuevo ticket". Seguirán pudiendo ver y comentar los tickets que les corresponden.
 
 **¿Los permisos aplican al usuario específico o al rol?**
-Al **rol**. No hay permisos individuales por usuario — todos los usuarios del mismo rol tienen exactamente los mismos permisos. Para dar capacidades especiales a una persona, debes cambiar su rol.
+Al **rol**. Todos los usuarios del mismo rol tienen exactamente los mismos permisos. Para dar capacidades especiales a una persona, cambia su rol.
 
-**¿Cuándo se reflejan los cambios de permisos en los usuarios?**
-En la próxima sesión del usuario (después de cerrar sesión y volver a entrar). Los cambios no se aplican a sesiones activas en curso.
+**¿Qué es el rol Soporte?**
+Es un rol reservado: existe en el sistema pero hoy no tiene usuarios ni columna en la matriz. Se activará en un cambio futuro.
 
 **¿Puedo tener dos Admins?**
-Sí. Puede haber múltiples usuarios con rol ADMIN. Todos tienen las mismas capacidades.
+Sí. Puede haber varios usuarios con rol Admin y todos tienen las mismas capacidades.
