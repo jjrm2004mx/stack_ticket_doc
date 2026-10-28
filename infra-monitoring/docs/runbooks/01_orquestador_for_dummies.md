@@ -115,9 +115,9 @@ startup.sh crea tres redes Podman antes de levantar los stacks:
 
 | Red | Subred | Propósito |
 |---|---|---|
-| `ticket-management-network` | 10.89.1.0/24 | Red compartida del ecosistema |
-| `ticket-classification-network` | 10.89.2.0/24 | Red del stack de clasificación |
-| `observability-network` | 10.89.3.0/24 | Red del stack de monitoreo |
+| `ticket-management-network` | asignada por Podman | Red compartida del ecosistema |
+| `ticket-classification-network` | asignada por Podman | Red del stack de clasificación |
+| `observability-network` | asignada por Podman | Red del stack de monitoreo |
 
 ---
 

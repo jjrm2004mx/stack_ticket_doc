@@ -254,7 +254,7 @@ docs/arquitectura/
 | Variable | Default | Descripción |
 |---|---|---|
 | `PROVIDER` | `ollama` | Provider LLM activo: `ollama` \| `oci` |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | URL de Ollama. En contenedor: `http://host.containers.internal:11434` |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | URL de Ollama. En contenedor: `http://ollama:11434` (requiere `ticket-classification-network`) |
 | `OLLAMA_LLM_MODEL` | `llama3.2:3b` | Modelo Ollama a usar |
 | `OCI_CONFIG_FILE` | `~/.oci/config` | Ruta al config de OCI (dentro del contenedor: `/root/.oci/config`) |
 | `OCI_PROFILE` | `DEFAULT` | Perfil del config OCI |
@@ -263,6 +263,7 @@ docs/arquitectura/
 | `OCI_MODEL` | `cohere.command-r-plus-08-2024` | Modelo OCI GenAI |
 | `OCI_TEMPERATURE` | `0` | Temperatura de generación |
 | `OCI_MAX_TOKENS` | `1400` | Máximo de tokens en la respuesta |
+| `OCI_REASONING_EFFORT` | vacío (compose: `LOW`) | Esfuerzo de razonamiento de `openai.gpt-oss-*`; vacío = no se envía |
 
 ### Embeddings
 
@@ -334,7 +335,10 @@ docs/arquitectura/
 |---|---|---|
 | `V1__init_kb.sql` | 2026-05-23 | `KB_CHUNKS`, índices HNSW + Oracle Text, `KB_INGEST_LOG`, vista `V_KB_LEAF_CHUNKS` |
 | `V2__add_graph_tables.sql` | 2026-05-27 | `KB_GRAPH_NODES`, `KB_GRAPH_EDGES`, Property Graph `ticket_sys_graph` |
-| `V3__add_specialized_tables.sql` | pendiente | `KB_MANUALS`, `KB_RUNBOOKS`, `KB_INCIDENTS`, `KB_ERROR_CATALOG` |
+| `V3__add_specialized_tables.sql` | 2026-10-07 | `KB_MANUALS`, `KB_RUNBOOKS`, `KB_INCIDENTS`, `KB_ERROR_CATALOG` |
+
+> 2026-10-07: la ADB se recreó (Always Free eliminada por inactividad) y V1–V3 se
+> aplicaron sobre la base nueva. Procedimiento: [08 — Recrear ADB en Rocky](08_recrear_adb_rocky.md).
 
 ### KB_CHUNKS — tabla principal (V1)
 
@@ -419,7 +423,7 @@ ONNXEmbedderAdapter — genera VECTOR(1024, FLOAT32)
 
 ```bash
 # Desde WSL — fuera del contenedor (CLI directo)
-cd ~/stack_ticket/ticket-agent
+cd ~/stack_agent/ticket-agent
 source .venv/bin/activate
 
 # Ingestar todo (usuarios + runbooks + helpContent)
@@ -475,7 +479,7 @@ ORDER BY INGEST_AT DESC;
 ### Red
 
 ```
-ticket-management-network (externa, subnet 10.89.1.0/24)
+ticket-management-network (externa) + observability-network (externa)
   └── ticket-agent :8002
         └── expone GET /api/v1/health, GET /api/v1/info, POST /api/v1/query
 ```
@@ -484,20 +488,19 @@ La red es **externa** — creada por `ticket-management` o por `infra-monitoring
 Si se levanta en modo aislado:
 
 ```bash
-podman network create --subnet 10.89.1.0/24 ticket-management-network
+podman network create ticket-management-network
 ```
 
 ### Conectividad con Ollama
 
-Ollama vive en `ticket-classification-network`, no en `ticket-management-network`.
-ticket-agent lo alcanza por la IP del host WSL mediante la entrada DNS especial de Podman rootless:
+Solo aplica con `PROVIDER=ollama` (en Rocky `PROVIDER=oci`). Ollama vive en
+`ticket-classification-network` y publica solo en `127.0.0.1` del host, así que no se
+alcanza por el host. Para usarlo, agregar `ticket-classification-network` a las redes de
+`ticket-agent` en `docker-compose.yml`; el valor por defecto
+`OLLAMA_BASE_URL=http://ollama:11434` resuelve en esa red.
 
-```bash
-# .env en contenedor
-OLLAMA_BASE_URL=http://host.containers.internal:11434
-```
-
-`host.containers.internal` resuelve automáticamente a la IP de la interfaz WSL del host.
+Todos los puertos de este stack (8002, 9011, 9012) se publican solo en `127.0.0.1`; desde
+otra máquina se usa el túnel SSH (infra-monitoring `10_redes_y_acceso_lan.md` §7).
 
 ### Resumen de puertos
 

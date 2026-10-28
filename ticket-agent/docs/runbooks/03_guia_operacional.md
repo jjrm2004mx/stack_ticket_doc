@@ -11,7 +11,7 @@ Operación día a día del agente RAG: arranque, re-ingesta, mantenimiento y dia
 bash ~/stack_ticket/infra-monitoring/startup.sh up
 
 # Solo este servicio
-cd ~/stack_ticket/ticket-agent
+cd ~/stack_agent/ticket-agent
 podman-compose up -d
 
 # Verificar arranque (esperar ~30s si es primera vez)
@@ -35,7 +35,7 @@ Application startup complete.
 ### Apagar
 
 ```bash
-cd ~/stack_ticket/ticket-agent
+cd ~/stack_agent/ticket-agent
 podman-compose down
 ```
 
@@ -44,7 +44,7 @@ podman-compose down
 ## Arranque rápido (modo desarrollo — CLI directo)
 
 ```bash
-cd ~/stack_ticket/ticket-agent
+cd ~/stack_agent/ticket-agent
 source .venv/bin/activate
 python -m src.main query --query "¿Cómo creo un ticket?" --rol usuario
 ```
@@ -70,25 +70,76 @@ El entorno virtual debe activarse en cada nueva sesión de terminal.
 
 ## Re-ingesta — Documentos (KB vectorial)
 
-Ejecutar cuando se agreguen o modifiquen documentos en los repos hermanos.
+Ejecutar cuando se agreguen o modifiquen documentos en los repos hermanos (runbooks,
+manuales de usuario `docs/usuarios`, ayudas `helpContent.ts`). Corre **en el host** de
+Rocky (no en el contenedor: el contenedor no tiene los repos hermanos ni el `.env`) y
+escribe en Oracle (`KB_CHUNKS`); el contenedor ve el resultado sin reiniciarse.
 
-```bash
-cd ~/stack_ticket/ticket-agent
-source .venv/bin/activate
+### Rutas de las fuentes en Rocky
 
-# Re-ingestar todos los documentos (usuarios + runbooks + helpContent)
-python -m src.main ingest --source all
+En Rocky el agente está en `~/stack_agent/ticket-agent` y los repos hermanos en
+`~/stack_ticket/`, así que los valores por defecto (`../ticket-management/...`, pensados para
+repos lado a lado) **no existen**. El `.env` del host debe tener, cada variable en **una sola
+línea**:
+
+```ini
+SOURCE_USUARIOS=../../stack_ticket/ticket-management/docs/usuarios
+SOURCE_RUNBOOKS=./docs/runbooks,../../stack_ticket/ticket-management/docs/runbooks,../../stack_ticket/ticket-classification/docs/runbooks,../../stack_ticket/notification-service/docs/runbooks,../../stack_ticket/infra-monitoring/docs/runbooks,../../stack_ticket/ticket-ingestion-light/docs/runbooks,../support-console/docs/runbooks
+SOURCE_HELP_TS=../../stack_ticket/ticket-management/frontend/src/components/help/helpContent.ts
 ```
 
-> Con `CHUNKING_STRATEGY=parent_child` (configuración actual) tarda ~35-45 min.
-> El proceso hace DELETE + INSERT en una sola transacción — si muere antes del COMMIT,
-> KB_CHUNKS queda intacta (rollback automático).
+Comprobar antes de ingerir (una ruta que no existe solo deja un WARNING y esa fuente queda
+fuera del conocimiento; `reingesta.sh revisar` también lo muestra en el conteo):
+
+```bash
+cd ~/stack_agent/ticket-agent
+for v in SOURCE_USUARIOS SOURCE_RUNBOOKS SOURCE_HELP_TS; do
+  grep -c "^$v=" .env | grep -q '^1$' || echo "REVISAR: $v falta o está repetida"
+done
+grep -E "^SOURCE_(USUARIOS|RUNBOOKS|HELP_TS)=" .env | cut -d= -f2 | tr ',' '\n' \
+  | while read p; do [ -e "$p" ] && echo "ok    $p" || echo "FALTA $p"; done
+```
+
+Antes, actualizar los repos: `make sync` en `~/stack_ticket/infra-monitoring` y `git pull`
+en `~/stack_agent/support-console`.
+
+### Ejecutar
+
+Con el script `reingesta.sh` de este repo. Corre en un **contenedor efímero** con la imagen
+del agente, que ya trae todas las dependencias (no se usa venv en el host: instalarlas trae
+torch, varios GB, y `/home` de Rocky no tiene espacio). Monta en solo lectura el `src` de
+este repo y las carpetas de documentos, con la estructura que esperan las rutas `SOURCE_*`.
+
+```bash
+cd ~/stack_agent/ticket-agent && git pull
+bash reingesta.sh revisar     # cuenta documentos por tipo y roles de las ayudas; no escribe nada
+bash reingesta.sh ingerir     # embebe y reemplaza KB_CHUNKS / KB_RUNBOOKS (≈ 75 min)
+```
+
+Resultado esperado de `revisar` (2026-10-17): `documentos: 109 {'usuarios': 17,
+'runbooks': 79, 'helpContent': 13}`.
+
+Avance, desde otra terminal:
+
+```bash
+grep -o "embebidos [0-9]*/[0-9]*" /tmp/reingesta-$(date +%F).log | tail -1
+grep -E "Listo|Traceback" /tmp/reingesta-$(date +%F).log | tail -1
+```
+
+> Con `CHUNKING_STRATEGY=parent_child` se embeben ~2800 fragmentos a ~2 min 45 s por cada 100
+> (≈ 75 min en total, 2026-10-17). Cada tabla destino (`KB_CHUNKS` para manuales y ayudas,
+> `KB_RUNBOOKS` para runbooks) se vacía y se vuelve a llenar en **una sola transacción**: si
+> el proceso falla, el asistente sigue con el conocimiento anterior. `KB_MANUALS` y
+> `KB_INCIDENTS` no se tocan. El asistente sigue respondiendo durante la ingesta.
 
 Logs esperados al finalizar:
 ```
-Oracle: 1557 chunks persistidos en KB_CHUNKS
-[ingest] Listo. 1557 chunks persistidos en ...
+Oracle: 2812 chunks persistidos en ['KB_CHUNKS', 'KB_RUNBOOKS']
+[ingest] Listo. 2812 chunks persistidos en ...
 ```
+
+Después, probar con preguntas reales (rol `soporte`) desde la consola o con
+`POST /api/v1/query`.
 
 ---
 
@@ -97,7 +148,7 @@ Oracle: 1557 chunks persistidos en KB_CHUNKS
 Ejecutar cuando cambie `docs/arquitectura/ecosistema.mmd` o se agreguen nuevos servicios.
 
 ```bash
-cd ~/stack_ticket/ticket-agent
+cd ~/stack_agent/ticket-agent
 source .venv/bin/activate
 
 python -m src.main ingest --source graph
@@ -211,7 +262,7 @@ Con `DEBUG` se ven las rutas de cada documento cargado y las dimensiones validad
 ## Diagnóstico Oracle
 
 ```bash
-cd ~/stack_ticket/ticket-agent
+cd ~/stack_agent/ticket-agent
 source .venv/bin/activate
 
 python3 - << 'EOF'

@@ -990,7 +990,7 @@ HYBRID_ALPHA=0.7                   # peso del score vectorial vs BM25 (0.0–1.0
 ### 9.2 Ejecutar la ingesta
 
 ```bash
-cd ~/stack_ticket/ticket-agent
+cd ~/stack_agent/ticket-agent
 source .venv/bin/activate
 python -m src.main ingest --source all
 ```
@@ -1039,7 +1039,7 @@ cat > /tmp/check_oracle.py << 'EOF'
 import oracledb, os
 from dotenv import load_dotenv
 
-load_dotenv("/home/jjrm/stack_ticket/ticket-agent/.env")
+load_dotenv("/home/jjrm/stack_agent/ticket-agent/.env")
 
 conn = oracledb.connect(
     user=os.environ["ORACLE_USER"],
@@ -1183,7 +1183,7 @@ El wallet está montado en `/root/.oci/wallet_ticketagent/`, no en `/home/jjrm/`
 
 **Diagnóstico rápido:**
 ```bash
-grep "ORACLE_CONFIG_DIR\|ORACLE_WALLET_DIR" ~/stack_ticket/ticket-agent/.env
+grep "ORACLE_CONFIG_DIR\|ORACLE_WALLET_DIR" ~/stack_agent/ticket-agent/.env
 # Si dice /home/jjrm/... → fix requerido
 ```
 
@@ -1192,8 +1192,8 @@ grep "ORACLE_CONFIG_DIR\|ORACLE_WALLET_DIR" ~/stack_ticket/ticket-agent/.env
 sed -i \
   's|ORACLE_CONFIG_DIR=/home/jjrm/.oci/wallet_ticketagent|ORACLE_CONFIG_DIR=/root/.oci/wallet_ticketagent|;
    s|ORACLE_WALLET_DIR=/home/jjrm/.oci/wallet_ticketagent|ORACLE_WALLET_DIR=/root/.oci/wallet_ticketagent|' \
-  ~/stack_ticket/ticket-agent/.env
-cd ~/stack_ticket/ticket-agent && podman-compose down && podman-compose up -d
+  ~/stack_agent/ticket-agent/.env
+cd ~/stack_agent/ticket-agent && podman-compose down && podman-compose up -d
 ```
 
 > **Regla de oro:** las variables `ORACLE_CONFIG_DIR` / `ORACLE_WALLET_DIR` en `.env` deben ser
@@ -1521,7 +1521,7 @@ El índice `IDX_KB_CONTENT_TEXT` fue eliminado durante la Fase 2 (ingesta interr
 lo dejó en estado FAILED). Debe crearse una vez, con datos ya en la tabla.
 
 ```bash
-cd ~/stack_ticket/ticket-agent
+cd ~/stack_agent/ticket-agent
 source .venv/bin/activate
 
 python3 -c "
@@ -1621,7 +1621,7 @@ Si `bm25=0` en todos los queries, el índice Oracle Text no está indexando corr
 #### Paso 2 — Ingestar el grafo desde WSL
 
 ```bash
-cd ~/stack_ticket/ticket-agent
+cd ~/stack_agent/ticket-agent
 source .venv/bin/activate
 
 python -m src.main ingest --source graph

@@ -1,6 +1,12 @@
 # 02 — Arquitectura Técnica
 ## notification-service · Referencia de servicios, redes y configuración
-**Mayo 2026**
+**Junio 2026 (actualizado)**
+
+> Este documento es la referencia de arquitectura original. Para documentacion mas
+> detallada y actualizada, ver:
+> - [`docs/arquitectura.md`](../arquitectura.md) — arquitectura completa y flujo detallado
+> - [`docs/configuracion.md`](../configuracion.md) — todas las variables de entorno
+> - [`docs/api.md`](../api.md) — endpoints HTTP y contratos del stream
 
 ---
 
@@ -65,7 +71,7 @@ networks:
 NOTIFICATION_EMAIL_PROVIDER=webhook
 
 # URL del webhook que recibe el correo generado (til-n8n)
-NOTIFICATION_WEBHOOK_URL=http://til-n8n:5678/webhook/notification-webhook
+NOTIFICATION_WEBHOOK_URL=http://til-n8n:5678/webhook/send-email
 
 # URL del portal del solicitante (botón CTA en correos)
 NOTIFICATION_PORTAL_URL=http://localhost:8090
@@ -106,34 +112,38 @@ REDIS_PASSWORD=
 ### Stream consumido
 
 ```
-Stream: ticket.events
-Consumer Group: notification-service-group
+Stream: ticket-events
+Consumer Group: notification-group
+Consumer Name: notif-consumer-1
 ```
 
-### Estructura de mensajes esperada
+> **ATENCION:** El stream key es `ticket-events` (con guion, no punto).
+> El consumer group es `notification-group`, no `notification-service-group`.
 
-```json
-{
-  "tipo": "ticket_created",
-  "ticket_id": "123",
-  "titulo": "No puedo acceder al sistema",
-  "estado": "ABIERTO",
-  "solicitante_email": "usuario@empresa.com",
-  "solicitante_nombre": "Juan García",
-  "dominio": "IT",
-  "categoria": "acceso",
-  "prioridad": "ALTA"
-}
-```
+### Campos del mensaje (todos son String en Redis)
+
+| Campo | Descripcion |
+|---|---|
+| `ticketId` | UUID del ticket |
+| `tenantId` | ID del tenant |
+| `eventType` | Tipo de evento (ver tabla abajo) |
+| `ticketTitle` | Titulo del ticket |
+| `ticketFolio` | Folio legible (ej: TKT-0042) |
+| `requesterEmail` | Correo del solicitante |
+| `requesterName` | Nombre del solicitante |
+| `performedByName` | Nombre del agente que actuo |
+| `oldValue` / `newValue` | Valores anterior/nuevo |
+| `oldLabel` / `newLabel` | Etiquetas legibles de los valores |
+| `notifyRequester` | String "true" o "false" — conversion manual en el consumidor |
 
 ### Tipos de evento soportados
 
-| Tipo | Cuándo se dispara | Plantilla usada |
+| eventType | Cuando se dispara | Plantilla usada |
 |---|---|---|
-| `ticket_created` | Ticket nuevo creado | `ticket-created.html` |
-| `ticket_updated` | Estado o datos cambiados | `ticket-updated.html` |
-| `ticket_closed` | Ticket cerrado | `ticket-closed.html` |
-| `comment_added` | Comentario agregado | `comment-added.html` |
+| `TICKET_CREATED` | Ticket nuevo creado | `email/ticket-created.html` |
+| `STATUS_CHANGED` | Estado cambiado (cierre: segun `newStatusOutcome`) | `email/status-changed.html`, `email/ticket-resolved.html` o `email/ticket-cancelled.html` |
+| `ASSIGNED` | Ticket asignado a agente | `email/assigned.html` |
+| `COMMENT_ADDED` | Comentario agregado | `email/comment-added.html` |
 
 ---
 
@@ -146,8 +156,9 @@ notification-service
      │ POST NOTIFICATION_WEBHOOK_URL
      │ Body: { "to": "...", "subject": "...", "html": "..." }
      ▼
-til-n8n :5678/webhook/notification-webhook
-     └─ Nodo Gmail → envía correo real
+til-n8n :5678/webhook/send-email          (sin canal: buzón de la plataforma)
+til-n8n :5678/webhook/canal-<id>/send      (ticket de un canal: buzón del canal, X-Send-Secret)
+     └─ Microsoft Graph sendMail → envía correo real
 ```
 
 ### Provider `resend` / `sendgrid`
@@ -170,29 +181,33 @@ podman restart notification-service
 
 ## 6. Plantillas Thymeleaf
 
-Las plantillas viven en `src/main/resources/templates/`.
+Las plantillas viven en `src/main/resources/templates/email/`.
 Son archivos HTML con expresiones Thymeleaf `${variable}`.
 
 ```
-templates/
-├── layout.html              # Layout base con cabecera/pie comunes
+templates/email/
+├── layout/
+│   └── base.html            # Layout compartido: cabecera azul, folio-box, boton CTA, pie
 ├── ticket-created.html      # Correo: ticket nuevo
-├── ticket-updated.html      # Correo: cambio de estado
-├── ticket-closed.html       # Correo: ticket cerrado
-└── comment-added.html       # Correo: comentario nuevo
+├── status-changed.html      # Correo: cambio de estado (muestra oldLabel -> newLabel)
+├── assigned.html            # Correo: ticket asignado a agente
+├── comment-added.html       # Correo: comentario agregado
+├── ticket-resolved.html     # Correo: ticket cerrado como Resuelto
+└── ticket-cancelled.html    # Correo: ticket cerrado como Cancelado
 ```
 
 Variables disponibles en todas las plantillas:
 
-| Variable | Valor |
+| Variable Thymeleaf | Origen |
 |---|---|
+| `${event}` | TicketDomainEvent completo (todos sus campos accesibles) |
+| `${folio}` | ticketFolio del evento, o primeros 8 chars del ticketId en mayusculas |
 | `${appName}` | `NOTIFICATION_APP_NAME` |
 | `${portalUrl}` | `NOTIFICATION_PORTAL_URL` |
-| `${emailFrom}` | `NOTIFICATION_EMAIL_FROM_NAME` |
-| `${ticket.id}` | ID del ticket |
-| `${ticket.titulo}` | Título del ticket |
-| `${ticket.estado}` | Estado actual |
-| `${ticket.categoria}` | Categoría clasificada |
+| `${oldLabel}` | Etiqueta del estado anterior (resuelve OPEN -> "Abierto", etc.) |
+| `${newLabel}` | Etiqueta del estado nuevo |
+
+El boton CTA enlaza a `${portalUrl}/status/${event.ticketId}`.
 
 ---
 
@@ -204,8 +219,11 @@ Tablas principales (Flyway en `src/main/resources/db/migration/`):
 
 | Tabla | Contenido |
 |---|---|
-| `notification_log` | Historial de notificaciones enviadas |
-| `notification_templates` | Registro de plantillas activas |
+| `notification_logs` | Historial de notificaciones enviadas (una fila por intento) |
+| `notification_provider_configs` | Configuracion del proveedor de email por tenant |
+
+> **ATENCION:** La tabla se llama `notification_logs` (plural, con s final).
+> No existe la tabla `notification_templates`.
 
 ### Conexión directa
 

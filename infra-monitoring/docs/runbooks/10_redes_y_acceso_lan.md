@@ -1,335 +1,233 @@
 # 10 — Redes y Acceso LAN
-## infra-monitoring · Exposición de puertos en WSL2 vs Linux nativo
-**Mayo 2026**
+## infra-monitoring · Acceso a los servicios de Rocky (LAN y túnel SSH)
+**Mayo 2026** · §7 actualizada en octubre de 2026
+
+> Las secciones 1–6 (WSL2, entorno de desarrollo que ya no se usa) se movieron a
+> `docs/historico/10_redes_wsl.md`. Este runbook conserva la numeración: lo vigente es la §7.
 
 ---
 
-## Índice
+## 7. Rocky (TIJDCAGENTIA) — política de acceso y túnel SSH del administrador
 
-1. [El problema: solo un puerto accesible desde LAN en WSL2](#1-el-problema-solo-un-puerto-accesible-desde-lan-en-wsl2)
-2. [Arquitectura de red WSL2](#2-arquitectura-de-red-wsl2)
-3. [Solución A — netsh portproxy por puerto](#3-solución-a--netsh-portproxy-por-puerto)
-4. [Solución B — WSL2 Mirrored Networking](#4-solución-b--wsl2-mirrored-networking)
-5. [Linux nativo — cómo funciona y por qué es más simple](#5-linux-nativo--cómo-funciona-y-por-qué-es-más-simple)
-6. [Tabla comparativa WSL2 vs Linux nativo](#6-tabla-comparativa-wsl2-vs-linux-nativo)
+Servidor: `TIJDCAGENTIA` · `10.187.21.30` · usuario `Agente` · firewalld activo.
 
----
+### Por qué los runbooks dicen `localhost` y desde Windows no funciona
 
-## 1. El problema: solo un puerto accesible desde LAN en WSL2
+Todos los contenedores publican **solo en `127.0.0.1`** de Rocky, salvo el portal
+(`8090`), que publica en todas las interfaces (cambio `aislar-redes-y-puertos`).
+Dentro de Rocky `curl http://localhost:PORT` responde. Desde otra máquina,
+`localhost` es esa misma máquina, y `http://10.187.21.30:PORT` no responde (el
+servicio no escucha en esa interfaz y además firewalld lo bloquea). El túnel SSH
+entra por el puerto 22 y reenvía cada puerto local al `localhost` de Rocky; por eso
+con el túnel las URLs `http://localhost:PORT` de los runbooks funcionan tal cual.
 
-En el setup de desarrollo en WSL2, todos los compose files del ecosistema
-usan bindings de puerto sin IP explícita (forma corta `"PORT:PORT"`), lo
-que debería exponer los servicios en todas las interfaces. Sin embargo,
-al intentar acceder desde otra máquina en la red local solo funciona
-`http://192.168.1.220:8090` (el frontend), mientras que los demás
-servicios solo responden en `localhost`.
+### Política vigente
 
-| URL | Accesible desde LAN | Accesible en localhost |
+Criterio: desde la LAN solo se ofrece lo que tiene login propio y es para usuarios;
+todo lo demás escucha en `127.0.0.1` y se usa por túnel.
+
+| Puerto | Servicio | ¿Login propio? | Acceso |
+|---|---|---|---|
+| 8090 | Portal (ticket-system-frontend) | Sí | **LAN**: `http://10.187.21.30:8090` |
+| 22 | SSH | Sí | LAN |
+| 9090 | Prometheus | No | Túnel (hasta 2026-10-17 respondía en la LAN) |
+| 3000 | Grafana | Sí — por defecto `admin/admin` | Túnel |
+| 5679 | n8n | No (contiene credenciales de Microsoft Graph) | Túnel |
+| 3001 | support-console | No — el rol se elige en un desplegable | Túnel |
+| 8080, 8081, 8000, 8001, 8002 | APIs internas | No | Túnel |
+| 9000/9001, 9002/9003 | MinIO API / consola | Consola sí | Túnel |
+| 5433, 5434, 5435 | PostgreSQL | Sí (usuario/password de BD) | Túnel — nunca abrir |
+| 6380, 6381 | Redis | Contraseña | Túnel — nunca abrir |
+| 3100, 9100, 11434 | Loki, node-exporter, Ollama | No | Túnel |
+| 9011, 9012 | Servidores MCP | No | Túnel |
+
+Para revisar las reglas de firewalld: `sudo firewall-cmd --list-ports`. La regla
+de 9090 que exista ya no tiene efecto (Prometheus no escucha en la LAN); quitarla
+es opcional: `sudo firewall-cmd --permanent --remove-port=9090/tcp && sudo firewall-cmd --reload`.
+
+### ¿Cómo entro a Grafana, Prometheus, n8n o la consola desde otra máquina?
+
+Sin la computadora del administrador también se puede, desde cualquier máquina de
+la red de la oficina que tenga `ssh` (Windows 10/11, Linux y macOS ya lo traen).
+La llave SSH solo está en la máquina del administrador: en otra máquina ssh pide la
+**contraseña del usuario `Agente`**.
+
+Túnel con lo más usado (PowerShell, en una sola línea):
+
+```powershell
+ssh -N -L 9090:localhost:9090 -L 3000:localhost:3000 -L 5679:localhost:5679 -L 3001:localhost:3001 -L 8002:localhost:8002 Agente@10.187.21.30
+```
+
+Mientras esa ventana siga abierta, en el navegador de **esa** máquina:
+`http://localhost:9090` (Prometheus), `http://localhost:3000` (Grafana),
+`http://localhost:5679` (n8n), `http://localhost:3001` (consola de soporte; usa también
+el 8002 del asistente). Al cerrar la ventana (`Ctrl+C`) el acceso se corta.
+
+Túnel completo con **todos** los puertos del ecosistema (una sola línea):
+
+```powershell
+ssh -N -L 3000:localhost:3000 -L 3001:localhost:3001 -L 3100:localhost:3100 -L 5433:localhost:5433 -L 5434:localhost:5434 -L 5435:localhost:5435 -L 5679:localhost:5679 -L 6380:localhost:6380 -L 6381:localhost:6381 -L 8000:localhost:8000 -L 8001:localhost:8001 -L 8002:localhost:8002 -L 8080:localhost:8080 -L 8081:localhost:8081 -L 8090:localhost:8090 -L 9000:localhost:9000 -L 9001:localhost:9001 -L 9002:localhost:9002 -L 9003:localhost:9003 -L 9011:localhost:9011 -L 9012:localhost:9012 -L 9090:localhost:9090 -L 9100:localhost:9100 -L 11434:localhost:11434 Agente@10.187.21.30
+```
+
+Si un puerto ya está ocupado en esa máquina, se cambia solo el lado local:
+`-L 19090:localhost:9090` y se abre `http://localhost:19090`.
+
+Fuera de la red de la oficina (por ejemplo desde casa) no se llega a `10.187.21.30`
+(IP privada) ni siquiera al portal: hace falta la VPN de la empresa.
+
+### Túnel del administrador (PowerShell en Windows)
+
+Un solo comando con todos los puertos. Dejar la ventana abierta; `Ctrl+C` lo cierra.
+
+```powershell
+ssh -N `
+  -L 5679:localhost:5679 `
+  -L 9090:localhost:9090 `
+  -L 3000:localhost:3000 `
+  -L 3001:localhost:3001 `
+  -L 8090:localhost:8090 `
+  -L 8080:localhost:8080 `
+  -L 8001:localhost:8001 `
+  -L 8002:localhost:8002 `
+  -L 8000:localhost:8000 `
+  -L 8081:localhost:8081 `
+  -L 9001:localhost:9001 `
+  -L 9003:localhost:9003 `
+  -L 5433:localhost:5433 `
+  -L 5434:localhost:5434 `
+  -L 5435:localhost:5435 `
+  Agente@10.187.21.30
+```
+
+Con el túnel activo, desde el navegador de Windows:
+
+| URL | Servicio |
+|---|---|
+| http://localhost:5679 | n8n |
+| http://localhost:9090 | Prometheus |
+| http://localhost:3000 | Grafana |
+| http://localhost:3001 | support-console |
+| http://localhost:8090 | Frontend de tickets |
+| http://localhost:8080/api/v1/actuator/health | ticket-system-backend |
+| http://localhost:8001/health | langchain-agent |
+| http://localhost:8002/api/v1/health | ticket-agent |
+| http://localhost:8000/health | langchain-api (gateway LLM) |
+| http://localhost:8081/actuator/health | notification-service |
+| http://localhost:9001 | MinIO consola — adjuntos de correos (ticket-classification) |
+| http://localhost:9003 | MinIO consola — adjuntos de tickets (ticket-management) |
+
+Bases de datos (DBeaver / pgAdmin desde Windows, host `localhost`):
+
+| Puerto | Contenedor | Base de datos |
 |---|---|---|
-| `:8090` — ticket-system-frontend | Sí | Sí |
-| `:3000` — Grafana | No | Sí |
-| `:9090` — Prometheus | No | Sí |
-| `:5679` — n8n | No | Sí |
-| `:8080` — ticket-system-backend | No | Sí |
-| `:8001` — langchain-agent | No | Sí |
-| `:8081` — notification-service | No | Sí |
-| `:8002` — ticket-agent RAG API | No | Sí |
+| 5433 | `ticket-db` | `tickets_db` |
+| 5434 | `classifier-db` | `classifier_db` |
+| 5435 | `notification-db` | `notifications_db` |
 
-**Causa raíz:** la configuración en los compose files es correcta. El
-problema es la capa de red que interpone WSL2 entre los contenedores y
-la red LAN. El puerto 8090 funciona desde LAN porque tiene una regla
-`netsh portproxy` y una excepción de Firewall de Windows configuradas
-manualmente en algún momento; los demás no las tienen.
+Este túnel diario deja fuera los que casi no se usan desde Windows (3100 Loki,
+9100 node-exporter, 11434 Ollama, 9000/9002 MinIO API S3, 6380/6381 Redis,
+9011/9012 MCP); el túnel completo de la sección anterior los incluye todos.
+Lista de puertos: [11_puertos_y_redes.md](11_puertos_y_redes.md).
 
----
+### Alternativa: dejarlo fijo en `~/.ssh/config`
 
-## 2. Arquitectura de red WSL2
-
-WSL2 corre como una máquina virtual ligera (Hyper-V) con su propia
-interfaz de red interna. Los contenedores bindan puertos dentro de esa VM,
-no en el NIC físico de Windows.
+En Windows, `C:\Users\<usuario>\.ssh\config`:
 
 ```
-Otra máquina (Windows/móvil)
-        │
-        │  192.168.1.220:PORT  ← IP física de la máquina Windows
-        ▼
-┌─────────────────────────────────────┐
-│           Windows Host              │
-│   NIC físico: 192.168.1.220         │
-│                                     │
-│   Relay automático localhost:PORT   │  ← Solo para conexiones locales
-│           │                         │
-│           ▼                         │
-│   ┌─────────────────────┐           │
-│   │   WSL2 VM (Linux)   │           │
-│   │   IP interna: 172.x │           │
-│   │                     │           │
-│   │   Podman containers │           │
-│   │   0.0.0.0:PORT      │           │
-│   └─────────────────────┘           │
-└─────────────────────────────────────┘
+# Túnel del administrador a Rocky (TIJDCAGENTIA)
+# Ver infra-monitoring/docs/runbooks/10_redes_y_acceso_lan.md §7
+# Uso: ssh -N rocky-tunel
+Host rocky-tunel
+    HostName 10.187.21.30
+    User Agente
+    LocalForward 5679 localhost:5679
+    LocalForward 9090 localhost:9090
+    LocalForward 3000 localhost:3000
+    LocalForward 3001 localhost:3001
+    LocalForward 8090 localhost:8090
+    LocalForward 8080 localhost:8080
+    LocalForward 8001 localhost:8001
+    LocalForward 8002 localhost:8002
+    LocalForward 8000 localhost:8000
+    LocalForward 8081 localhost:8081
+    LocalForward 9001 localhost:9001
+    LocalForward 9003 localhost:9003
+    LocalForward 5433 localhost:5433
+    LocalForward 5434 localhost:5434
+    LocalForward 5435 localhost:5435
+    ExitOnForwardFailure yes
+    ServerAliveInterval 60
 ```
 
-### Por qué `localhost` funciona
-
-Windows mantiene un **relay automático** que intercepta conexiones a
-`localhost:PORT` y las reenvía a la VM WSL2. Por eso todos los servicios
-son accesibles desde el mismo equipo Windows.
-
-### Por qué la IP LAN no funciona (por defecto)
-
-El tráfico que llega a `192.168.1.220` (la IP del NIC físico) no pasa
-por ese relay. Para que alcance a los contenedores en WSL2 hace falta
-una regla explícita de reenvío de puertos.
-
-### Por qué la IP de WSL2 cambia en cada reinicio
-
-La VM WSL2 recibe una IP del rango `172.x` asignada dinámicamente por
-Hyper-V. Cualquier regla que apunte a esa IP queda obsoleta tras un
-`wsl --shutdown`. Los scripts de portproxy deben detectar la IP en
-runtime.
-
----
-
-## 3. Solución A — netsh portproxy por puerto
-
-Requiere abrir PowerShell como Administrador en Windows.
-
-### Script de configuración
+Y se abre con:
 
 ```powershell
-# Detectar IP actual de WSL2
-$wsl_ip = (wsl hostname -I).Trim().Split(" ")[0]
-
-# Puertos del ecosistema a exponer en LAN
-$ports = @(3000, 5679, 8001, 8002, 8080, 8081, 8090, 9090)
-# 3000  → Grafana
-# 5679  → n8n (ticket-ingestion-light)
-# 8001  → langchain-agent (ticket-classification)
-# 8002  → ticket-agent RAG API
-# 8080  → ticket-system-backend
-# 8081  → notification-service
-# 8090  → ticket-system-frontend
-# 9090  → Prometheus
-
-foreach ($port in $ports) {
-    # Redirigir tráfico LAN → WSL2
-    netsh interface portproxy add v4tov4 `
-        listenaddress=0.0.0.0 `
-        listenport=$port `
-        connectaddress=$wsl_ip `
-        connectport=$port
-
-    # Abrir el puerto en el Firewall de Windows
-    netsh advfirewall firewall add rule `
-        name="WSL2 stack $port" `
-        dir=in action=allow protocol=TCP localport=$port
-}
-
-Write-Host "Puertos expuestos en LAN para WSL2 IP: $wsl_ip"
-netsh interface portproxy show all
+ssh -N rocky-tunel
 ```
 
-### Verificar reglas activas
+`ExitOnForwardFailure yes` hace que el túnel falle de inmediato si algún
+puerto local ya está ocupado, en vez de arrancar a medias.
+
+> ssh pide la contraseña de `Agente` aunque se use `-N`. Los puertos no se
+> abren hasta autenticarse. Una vez aceptada, la ventana queda "colgada" sin
+> mostrar nada: ese es el estado correcto.
+
+### Verificar que el túnel está activo
+
+En otra ventana de PowerShell:
 
 ```powershell
-netsh interface portproxy show all
+Test-NetConnection localhost -Port 5679
+# TcpTestSucceeded : True  → el túnel escucha en ese puerto
 ```
 
-### Eliminar todas las reglas (limpiar)
+Si falla, lanzar el túnel en modo verbose para ver en qué paso se queda:
 
 ```powershell
-netsh interface portproxy reset
-
-$ports = @(3000, 5679, 8001, 8002, 8080, 8081, 8090, 9090)
-foreach ($port in $ports) {
-    netsh advfirewall firewall delete rule name="WSL2 stack $port"
-}
+ssh -v -N rocky-tunel
+# Esperado:
+#   Authenticated to 10.187.21.30 ...
+#   Local forwarding listening on 127.0.0.1 port 5679.
+#   (una línea por cada puerto)
 ```
 
-### Cuándo ejecutarlo
+### Troubleshooting del túnel
 
-Solo aplica en Windows con WSL2. Ejecutar manualmente en PowerShell como
-Administrador después de cada reinicio de Windows, antes de acceder al
-stack desde otra máquina en la red.
-
-```powershell
-# PowerShell como Administrador
-.\wsl2-portproxy.ps1
-```
-
-En Mac o Linux nativo este script no es necesario — los puertos quedan
-expuestos en LAN automáticamente al levantar el stack.
-
-### Limitación
-
-La IP interna de WSL2 cambia con cada reinicio de Windows. El script
-la detecta en runtime, por eso hay que re-ejecutarlo tras cada reinicio.
-
----
-
-## 4. Solución B — WSL2 Mirrored Networking
-
-> **Requiere Windows 11 22H2 (build 22621) o posterior.**
-> En Windows 10 la opción `networkingMode=mirrored` es silenciosamente
-> ignorada por WSL2 — `ip addr show` no mostrará la IP LAN aunque el
-> `.wslconfig` esté correctamente guardado. Verificado en Windows 10 Pro
-> build 19045.
-
-Disponible desde Windows 11 22H2 con WSL versión 2.0+. Con este modo
-WSL2 comparte directamente las interfaces de red de Windows — todos los
-puertos bindeados en WSL2 quedan automáticamente accesibles en la IP LAN
-sin reglas manuales.
-
-### Activar mirrored networking
-
-Editar (o crear) el archivo `C:\Users\<usuario>\.wslconfig`:
-
-```ini
-[wsl2]
-networkingMode=mirrored
-```
-
-Aplicar el cambio:
-
-```powershell
-wsl --shutdown
-# Abrir de nuevo la terminal WSL2
-```
-
-### Verificar que está activo
-
-```bash
-# En WSL2 — debe mostrar la misma IP que el NIC físico de Windows
-ip addr show eth0
-```
-
-### Ventajas sobre portproxy
-
-| Aspecto | portproxy | mirrored |
+| Síntoma | Causa | Solución |
 |---|---|---|
-| Configuración inicial | Script manual por puerto | Una línea en `.wslconfig` |
-| Tras reiniciar | Re-ejecutar script | Automático |
-| Puertos nuevos | Agregar al script | Automático |
-| Compatibilidad | Windows 10+ | Windows 11 22H2+ |
+| **Todas** las URLs `localhost` dan "conexión rechazada", pero `http://10.187.21.30:8090` sí carga | El túnel no está escuchando en Windows: sigue esperando la contraseña, falló al arrancar o se cerró | Revisar la ventana del túnel; `Test-NetConnection localhost -Port 5679`; relanzar con `ssh -v -N rocky-tunel` |
+| `bind [127.0.0.1]:PORT: Address already in use` | Ese puerto ya lo usa algo en Windows (otro túnel abierto, WSL, un servicio local) | Cerrar el otro proceso, o mapear a otro puerto local: `-L 15679:localhost:5679` y abrir `http://localhost:15679` |
+| `channel N: open failed: connect failed: Connection refused` al abrir la URL | El túnel está bien pero el contenedor no está arriba en Rocky | En Rocky: `podman ps` y `curl -I http://localhost:PORT` |
+| La ventana del túnel se cierra sola tras un rato | Timeout de inactividad | Agregar `-o ServerAliveInterval=60` (ya incluido en `~/.ssh/config`) |
 
-### Consideración de red interna Podman
+### Cuando se abra a usuarios (pendiente)
 
-Con mirrored networking las subnets de Podman (`10.89.x.0/24`) pueden
-coincidir con rangos de la red corporativa. Verificar que no hay
-conflicto antes de activarlo:
+Abrir un puerto para todos:
 
 ```bash
-podman network ls
-# Comparar subnets con ip route en el host
-```
-
----
-
-## 5. Linux nativo — cómo funciona y por qué es más simple
-
-En un servidor Linux nativo (física o VM), no existe la capa de
-virtualización de WSL2. Podman y Docker crean reglas `iptables`/`nftables`
-directamente en el kernel del host.
-
-```
-Otra máquina (Windows/móvil)
-        │
-        │  192.168.1.220:PORT
-        ▼
-┌─────────────────────────────────────┐
-│        Servidor Linux               │
-│   NIC: 192.168.1.220                │
-│                                     │
-│   iptables / nftables               │  ← regla creada por Podman al
-│       │                             │    declarar "PORT:PORT"
-│       ▼                             │
-│   Contenedor: 0.0.0.0:PORT         │
-└─────────────────────────────────────┘
-```
-
-Cuando el compose declara `"8090:80"`, Podman inserta una regla DNAT
-que redirige el tráfico del puerto 8090 del host al contenedor. Eso
-aplica a **todas las interfaces de red**, incluyendo el NIC físico
-conectado a la LAN.
-
-No hay portproxy, no hay relay, no hay configuración extra. Cualquier
-máquina en la misma red puede acceder a `http://IP_SERVIDOR:8090`
-inmediatamente después de levantar el stack.
-
-### El único bloqueador: firewall del host
-
-Si el servidor tiene firewall activo, hay que abrir los puertos
-explícitamente.
-
-**Ubuntu / Debian (`ufw`):**
-
-```bash
-sudo ufw status
-
-sudo ufw allow 8090/tcp   # ticket-system-frontend
-sudo ufw allow 8080/tcp   # ticket-system-backend
-sudo ufw allow 8081/tcp   # notification-service
-sudo ufw allow 8001/tcp   # langchain-agent
-sudo ufw allow 8002/tcp   # ticket-agent RAG API
-sudo ufw allow 5679/tcp   # n8n
-sudo ufw allow 3000/tcp   # Grafana
-sudo ufw allow 9090/tcp   # Prometheus
-
-sudo ufw reload
-```
-
-**RHEL / Fedora / Rocky (`firewalld`):**
-
-```bash
-sudo firewall-cmd --list-ports
-
-for PORT in 8090 8080 8081 8001 8002 5679 3000 9090; do
-    sudo firewall-cmd --permanent --add-port=${PORT}/tcp
-done
-
+sudo firewall-cmd --permanent --add-port=8090/tcp
 sudo firewall-cmd --reload
 ```
 
-### Sin firewall activo (frecuente en entornos de desarrollo)
-
-En muchas instalaciones de servidor Linux orientadas a desarrollo, `ufw`
-y `firewalld` están desactivados. En ese caso todos los puertos del
-compose quedan accesibles en LAN desde el primer `podman-compose up`.
+Abrir un puerto solo para una subred o IPs concretas (recomendado para
+servicios sin login, como support-console):
 
 ```bash
-# Verificar si ufw está activo
-sudo ufw status
-# Salida: "Status: inactive" → no bloquea nada
-
-# Verificar si firewalld está activo
-sudo systemctl is-active firewalld
-# Salida: "inactive" → no bloquea nada
+sudo firewall-cmd --permanent \
+  --add-rich-rule='rule family="ipv4" source address="<SUBRED>/24" port port="3001" protocol="tcp" accept'
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-rich-rules
 ```
 
----
+Antes de abrir Grafana (3000), cambiar la contraseña de `admin`.
+`GRAFANA_PASSWORD` solo se aplica en el primer arranque (cuando el volumen
+de Grafana está vacío); con el volumen ya creado, cambiarla así:
 
-## 6. Tabla comparativa WSL2 vs Linux nativo
+```bash
+podman exec -it grafana grafana cli admin reset-admin-password '<NUEVA_PASSWORD>'
+```
 
-| Aspecto | WSL2 (desarrollo Windows) | Linux nativo (servidor) |
-|---|---|---|
-| Capa de red extra | Sí — VM Hyper-V con NAT | No |
-| `localhost:PORT` | Funciona (relay automático) | Funciona |
-| `IP_LAN:PORT` | Solo con portproxy o mirrored | Funciona automáticamente |
-| IP del host cambia al reiniciar | Sí (IP interna de la VM) | No (IP fija del NIC) |
-| Configuración extra para LAN | Sí (`netsh portproxy` o `.wslconfig`) | Solo si firewall está activo |
-| Compose files a modificar | Ninguno | Ninguno |
-| Reglas iptables creadas por Podman | En la VM WSL2 | En el host directamente |
-| Acceso desde otra máquina sin config | No | Sí |
-
-### Implicación para este stack
-
-Los compose files del ecosistema ya están correctamente configurados
-con bindings `"PORT:PORT"` en todos los servicios. En Linux nativo
-funcionan sin cambios. La diferencia de acceso LAN es exclusivamente
-una consecuencia de la arquitectura de red de WSL2, no de la
-configuración de los contenedores.
+y actualizar `GRAFANA_PASSWORD` en el `.env` para que quede consistente.
 
 ---
 

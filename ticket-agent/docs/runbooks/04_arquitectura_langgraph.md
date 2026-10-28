@@ -12,6 +12,35 @@ el agente puede enriquecer el contexto y reintentar antes de responder.
 
 ---
 
+## Intent Router — clasificación de intent antes del grafo
+
+El Intent Router es el primer paso del pipeline. Clasifica la query entrante y decide
+qué rama del grafo se activa, antes de que empiece el flujo RAG.
+
+| Intent | Descripción | Ruta en el grafo |
+|---|---|---|
+| `knowledge` | Pregunta de documentación, configuración o procedimientos | Flujo RAG completo (retrieve → generate) |
+| `observability` | Pregunta sobre estado actual, métricas, logs o alertas | Solo nodo Observability (MCP Loki + Prometheus) |
+| `hybrid` | Combina documentación + estado en tiempo real | Ambas ramas en paralelo |
+
+**Rol requerido para `observability` e `hybrid`:** `soporte`.
+Los roles `usuario`, `manager` y `admin` siempre van al flujo `knowledge` independientemente
+de cómo esté redactada la pregunta.
+
+**Keywords que activan `observability`:** errores, logs, métricas, latencia, requests,
+alertas, caído, lento, timeout, estado actual, última hora, últimos N minutos.
+
+```
+src/agent/
+├── intent_router.py  → clasificación de intent
+├── state.py          → AgentState — estado compartido entre nodos
+├── nodes.py          → funciones de nodo + constantes
+├── observability_nodes.py → nodos MCP (Loki + Prometheus)
+└── graph.py          → StateGraph compilado (build_graph)
+```
+
+---
+
 ## Estructura del grafo
 
 ```
@@ -58,45 +87,61 @@ class AgentState(TypedDict):
 ## Diagrama del grafo (configuración actual)
 
 ```
-             ┌─────────────────────────────┐
-    inicio → │ hyde (opt-in HYDE_ENABLED)  │
-             │ LLM genera doc hipotético   │
-             │ → hyde_query en el estado   │
-             └─────────────┬───────────────┘
-                           │
-             ┌─────────────▼───────────────┐
-             │ retrieve (Multi-Query RRF)  │
-             │ usa hyde_query si existe    │
-             │ N variantes → Hybrid Search │
-             │ → RRF → top-K chunks        │
-             └─────────────┬───────────────┘
-                           │
-             ┌─────────────▼───────────────┐
-             │ graph_traverse (opcional)   │  ← solo si VECTOR_STORE=oracle
-             │ keywords detectados en query│    y keywords de arquitectura
-             │ → SQL/PGQ → KB_GRAPH        │
-             │ → añade relaciones al ctx   │
-             └─────────────┬───────────────┘
-                           │
-                    ┌──────▼──────┐
-                    │  generate   │
-                    └──────┬──────┘
-                           │
-                    ┌──────▼──────┐
-                    │  validate   │
-                    └──────┬──────┘
-                           │
-               ┌───────────┴────────────┐
-               │                        │
-         conf ≥ 0.5               conf < 0.5
-         ciclos ≥ 1               ciclos < 1
-               │                        │
-              END               ┌───────▼───────┐
-                                │   web_fetch   │
-                                │  (placeholder)│
-                                └───────┬───────┘
-                                        │
-                                 (vuelve a generate)
+                    ┌──────────────────┐
+         inicio →   │  intent_router   │
+                    └────────┬─────────┘
+                             │
+              ┌──────────────┼──────────────────┐
+              │              │                  │
+          knowledge    observability          hybrid
+              │              │            (ambas ramas)
+              │    ┌─────────▼──────────┐       │
+              │    │  observability     │       │
+              │    │  MCP Loki          │       │
+              │    │  MCP Prometheus    │       │
+              │    └─────────┬──────────┘       │
+              │              │                  │
+              ▼              ▼                  ▼
+┌─────────────────────────────────────────────────────┐
+│             ┌─────────────────────────────┐         │
+│    inicio → │ hyde (opt-in HYDE_ENABLED)  │         │
+│             │ LLM genera doc hipotético   │         │
+│             │ → hyde_query en el estado   │         │
+│             └─────────────┬───────────────┘         │
+│                           │                         │
+│             ┌─────────────▼───────────────┐         │
+│             │ retrieve (Multi-Query RRF)  │         │
+│             │ usa hyde_query si existe    │         │
+│             │ N variantes → Hybrid Search │         │
+│             │ → RRF → top-K chunks        │         │
+│             └─────────────┬───────────────┘         │
+│                           │                         │
+│             ┌─────────────▼───────────────┐         │
+│             │ graph_traverse (opcional)   │         │
+│             │ keywords de arquitectura    │         │
+│             │ → SQL/PGQ → KB_GRAPH        │         │
+│             └─────────────┬───────────────┘         │
+│                           │                         │
+│                    ┌──────▼──────┐                  │
+│                    │  generate   │                  │
+│                    └──────┬──────┘                  │
+│                           │                         │
+│                    ┌──────▼──────┐                  │
+│                    │  validate   │                  │
+│                    └──────┬──────┘                  │
+│                           │                         │
+│               ┌───────────┴────────────┐            │
+│               │                        │            │
+│         conf ≥ 0.5               conf < 0.5         │
+│         ciclos ≥ 1               ciclos < 1         │
+│               │                        │            │
+│              END               ┌───────▼───────┐    │
+│                                │   web_fetch   │    │
+│                                │  DuckDuckGo   │    │
+│                                └───────┬───────┘    │
+│                                        │            │
+│                                 (vuelve a generate) │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---

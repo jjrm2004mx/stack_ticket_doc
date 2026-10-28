@@ -19,7 +19,7 @@ Como Admin heredas todas las capacidades de Manager más las exclusivas de Admin
 - Ver todos los tickets del sistema
 - Crear tickets nuevos
 - Editar cualquier campo de cualquier ticket
-- Cambiar estado (incluyendo ABIERTO → CERRADO directamente)
+- Cambiar estado por las transiciones configuradas en el workflow
 - Asignar y reasignar tickets
 - Agregar comentarios
 - Ver y descargar adjuntos
@@ -47,10 +47,21 @@ Esta es una función exclusiva de Admin. Permite crear, modificar y controlar lo
    - Nombre completo
    - Email (será el identificador de inicio de sesión)
    - Rol: `USER`, `MANAGER` o `ADMIN`
-   - Contraseña inicial (el usuario deberá cambiarla)
-3. Guarda el usuario
+3. Haz clic en **"Crear y enviar invitación"**
+
+El usuario aparece como **"✉ Invitado"** y recibe por correo una invitación (válida 72 horas) para definir su propia contraseña. Tú nunca la ves ni la eliges. Hasta que acepte la invitación no puede iniciar sesión.
 
 **Nota:** el rol del usuario determina qué permisos tiene en el sistema según la matriz de `role_permissions`.
+
+### Reenviar una invitación
+Si un invitado no recibió el correo o su enlace venció, haz clic en **"Reenviar invitación"** en su fila. Le llega un enlace nuevo y el anterior deja de funcionar.
+
+### Un usuario no puede iniciar sesión
+Haz clic en **"Enviar enlace para restablecer contraseña"** en su fila y confirma. El usuario recibe en su propio correo un enlace (válido 60 minutos, de un solo uso) para definir una nueva contraseña. Al usarlo, todas sus sesiones abiertas terminan y, si su cuenta estaba bloqueada por intentos fallidos, se desbloquea. Puedes enviar hasta 10 enlaces por hora al mismo usuario.
+
+El usuario también puede pedirlo solo con **"¿Olvidaste tu contraseña?"** en la página de inicio de sesión.
+
+**Bloqueo por intentos:** después de 5 contraseñas incorrectas en 15 minutos la cuenta queda bloqueada 15 minutos (el inicio de sesión responde "Credenciales inválidas" aunque la contraseña sea correcta). Se desbloquea sola o al restablecer la contraseña.
 
 ### Editar un usuario existente
 1. Busca el usuario en la lista
@@ -59,9 +70,18 @@ Esta es una función exclusiva de Admin. Permite crear, modificar y controlar lo
 4. **Cambiar el rol** de un usuario tiene efecto inmediato en sus permisos desde la próxima vez que inicie sesión
 
 ### Desactivar un usuario
-Si un usuario ya no debe tener acceso al sistema, desactívalo (no lo elimines — se preserva el historial de sus acciones).
+Si un usuario ya no debe tener acceso al sistema, desactívalo con **"Desactivar"** (no lo elimines — se preserva el historial de sus acciones). Ya no podrá iniciar sesión y sus sesiones abiertas terminan en menos de un minuto.
 
-**Precaución:** desactivar a un usuario no reasigna automáticamente sus tickets abiertos. Debes reasignarlos manualmente antes o después de desactivarlo.
+Al presionar **"Desactivar"** se abre un diálogo que revisa qué afecta:
+
+- **Sus tickets abiertos** (sin archivar y fuera de un estado Cerrado). Eliges qué hacer con ellos:
+  - **Reasignarlos con la regla de su área y categoría** (opción por defecto): cada ticket va con quien le toque según la pestaña "👥 Asignación"; los que no tengan regla quedan sin asignar.
+  - **Asignarlos a** una persona activa que elijas.
+  - **Dejarlos sin asignar**, para repartirlos después.
+  - **Dejarlos asignados a él**: nadie más los tendrá como suyos; solo los verá quien tenga "Ver todos los tickets".
+- **Las reglas de asignación** en las que recibe tickets. Con **"Quitarlo de esas reglas"** (marcado por defecto) sale de todas; una regla que se queda sin nadie se borra: el área queda en "Nadie" y la categoría vuelve a "Igual que el área". Si no lo quitas, las reglas se lo saltan mientras esté inactivo, pero **si lo reactivas vuelve a recibir tickets**.
+
+Los tickets cerrados o archivados conservan a la persona como responsable. Cada reasignación queda en el historial del ticket a tu nombre y, si "Asignación" está encendida en Notificaciones, el solicitante recibe el aviso con el nombre de la nueva persona. Si algo falla (por ejemplo, la persona elegida ya no está activa), no se desactiva nada.
 
 ---
 
@@ -69,7 +89,7 @@ Si un usuario ya no debe tener acceso al sistema, desactívalo (no lo elimines �
 
 Las áreas y sus categorías organizan los tickets; el clasificador automático asigna cada correo a un área y una categoría de este catálogo.
 
-**Cómo acceder:** encabezado → **"🏷️ Áreas y categorías"**
+**Cómo acceder:** menú de la izquierda → **"Áreas y categorías"**
 
 ### Áreas disponibles por defecto:
 - `IT` — tecnología e infraestructura (color #0066FF)
@@ -95,40 +115,65 @@ Las áreas y sus categorías organizan los tickets; el clasificador automático 
 
 **Impacto:** las nuevas áreas y categorías quedan disponibles de inmediato para asignar a tickets y en el catálogo que consulta el clasificador automático. Los nombres no se pueden repetir aunque cambien las mayúsculas. Nada se elimina: un área o categoría se desactiva y sus correos llegan como borradores a la Bandeja de revisión. El detalle completo está en `configuracion.md`.
 
+### Asignación automática por área y categoría (pestaña "👥 Asignación")
+
+Define quién recibe los tickets que entran por correo, según su área y categoría. Sin reglas, los tickets entran sin asignar, como siempre.
+
+**Cómo acceder:** menú de la izquierda → **"Reglas de asignación"** (o "Áreas y categorías" → pestaña **"Asignación"**). La tabla muestra una fila por área ("toda el área") y debajo una por cada categoría, con quién recibe sus tickets y la modalidad.
+
+**Modalidades:**
+- **Responsable directo:** una sola persona recibe todos los tickets de esa fila. La misma persona puede ser responsable de varias áreas y categorías.
+- **Menor carga:** entre varias personas, recibe el ticket quien tenga menos tickets abiertos asignados (si empatan, por nombre).
+
+**Ejemplo:** Ana atiende todo IT, salvo lo de red, que va con Carlos.
+1. Fila **IT (toda el área)** → **Editar** → "Responsable directo" → Ana → **Guardar**. Las categorías de IT muestran "↳ igual que IT · Ana".
+2. Fila **red** → **Editar** → "Responsable directo" → Carlos → **Guardar**.
+3. Un correo IT/vpn se asigna a Ana; uno IT/red, a Carlos.
+
+**Reglas:**
+- La regla de una categoría manda sobre la de su área. Para quitarla, en la fila de la categoría elige **"Igual que el área"**.
+- Un área con **"Nadie"** (⚠) deja sus tickets sin asignar, para que el administrador los asocie.
+- Una persona inactiva aparece tachada y se salta; si una categoría se queda sin nadie activo, se usa la regla de su área.
+- **"Ver por persona"** muestra en qué filas recibe tickets alguien (útil antes de desactivarlo).
+- Solo se asignan solos los correos que entran **activos**. Los borradores no se asignan solos: al aprobarlos en la Bandeja de revisión, "Asignar a" viene propuesto con la persona de la regla. En **"+ Nuevo ticket"** también se propone al elegir "Área · Categoría"; en ambos casos puedes cambiarla ("Usar la sugerencia" la vuelve a poner).
+- Reclasificar un ticket activo no cambia su asignado.
+- En el historial del ticket, una asignación hecha por la regla aparece como **"⚙ Asignado automáticamente"**. Si "Asignación" está encendida en Notificaciones, el solicitante recibe el aviso con el nombre de la persona asignada.
+
 ---
 
 ## 4. Configurar el workflow (MANAGE_WORKFLOW)
 
-El workflow define los estados del sistema y las transiciones permitidas entre ellos.
+**Pantalla:** "⚙️ Gestión de Workflow" ("Workflow" en el menú de la izquierda; tiene ayuda "?")
+**Permiso requerido:** MANAGE_WORKFLOW
 
-**Cómo acceder:** menú principal → **"Configuración de Workflow"**
+El workflow define por qué estados pasa un ticket y a quién se le informa. Se aplica a todos los tickets de la organización, también a los que llegan por correo.
 
-### Estados configurables:
-Por cada estado puedes modificar:
-- Nombre visible en la interfaz
-- Descripción
-- Color (hex)
-- Si notifica automáticamente al solicitante al llegar a este estado (`notifyRequester`)
-- Posición de visualización
+### Estados
 
-### Transiciones configurables:
-Por cada transición puedes definir:
-- Estado de origen
-- Estado de destino
-- Rol requerido (`NULL` = cualquier rol con CHANGE_STATUS, o especificar `MANAGER` / `ADMIN`)
-- Descripción
+Cada estado tiene un nombre que eliges y una categoría fija que entiende el sistema: Nuevo, En curso, En espera o Cerrado (Resuelto o Cancelado). Las métricas, los filtros y el cierre siguen la categoría (ver "Estados y transiciones — Admin").
 
-**Advertencia crítica:** los cambios en el workflow afectan a TODOS los tickets activos en tiempo real. Una transición eliminada o modificada puede bloquear tickets en progreso. Planifica los cambios de workflow fuera de horario de trabajo y comunica los cambios al equipo antes de aplicarlos.
+1. **"+ Nuevo estado":** nombre, categoría, resultado (solo Cerrado), descripción y color.
+2. **"Editar":** nombre, descripción y color; **↑/↓** cambia el orden de las columnas del tablero.
+3. **"Hacer inicial":** elige el estado de categoría Nuevo donde entran los tickets nuevos.
+4. **"Desactivar":** mueve los tickets del estado al que elijas (sin correo a los solicitantes) y lo desactiva; **"Activar"** lo vuelve a usar.
 
-**Configuración actual de transiciones (defaults del sistema):**
+### Transiciones
 
-| De | A | Rol requerido |
-|---|---|---|
-| OPEN | IN_PROGRESS | Sin restricción |
-| IN_PROGRESS | IN_REVIEW | Sin restricción |
-| IN_REVIEW | IN_PROGRESS | Sin restricción |
-| IN_REVIEW | CLOSED | MANAGER |
-| OPEN | CLOSED | ADMIN |
+Cada interruptor activa o desactiva un movimiento de un estado a otro (desde el tablero o el detalle) y se aplica de inmediato para todos. Una transición que sale de un estado Cerrado permite reabrir. La pantalla rechaza los cambios que dejan un estado sin camino a un estado Cerrado y muestra la regla que se rompería.
+
+La pantalla no muestra ni edita un rol requerido por transición: cualquier rol con el permiso "Cambiar estado" puede ejecutar las transiciones activas.
+
+Transiciones de fábrica: Abierto → En progreso, Abierto → Cerrado, En progreso → En revisión, En revisión → En progreso y En revisión → Cerrado.
+
+### Notificaciones
+
+La pantalla **Notificaciones** es la lista completa de lo que puede recibir el solicitante por correo; lo que no esté encendido no se envía:
+- **Avisos por tipo de evento:** "Creación", "Asignación" y "Comentario".
+- **Cambio de estado: avisar al entrar a…:** un interruptor por estado; se avisa cuando el ticket entra a ese estado.
+
+Siempre hace falta que el ticket tenga activados los avisos al solicitante y que este tenga correo. Nunca se notifican las correcciones (solicitante, fecha límite, área/categoría), los adjuntos, los movimientos al desactivar un estado ni lo que el solicitante agrega al responder el correo. Una organización nueva solo avisa la **creación** y la **entrada a un estado Cerrado**.
+
+**Precaución:** apagar "Creación" silencia los correos de creación, también los de tickets que llegan por correo.
 
 ---
 
@@ -206,7 +251,6 @@ A diferencia de Manager (que solo puede aprobar), Admin puede eliminar borradore
 
 | Acción exclusiva de Admin | Descripción |
 |---|---|
-| ABIERTO → CERRADO directamente | Cerrar sin pasar por EN PROGRESO ni EN REVISIÓN |
 | ARCHIVE_TICKET | Archivar cualquier ticket |
 | MANAGE_USERS | Crear, editar y desactivar usuarios |
 | MANAGE_CLASSIFICATIONS | Gestionar áreas y categorías y exportar la revisión del clasificador |

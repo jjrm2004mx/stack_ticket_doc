@@ -23,10 +23,13 @@ El sistema tiene tres roles:
 - `ADMIN` — administrador, acceso total al sistema
 
 ### Crear usuario
-1. Haz clic en **"Nuevo Usuario"**
-2. Ingresa: nombre completo, email, rol, contraseña inicial
-3. Guarda
-4. El usuario puede iniciar sesión inmediatamente
+1. Haz clic en **"+ Nuevo Usuario"**
+2. Ingresa: nombre completo, email y rol
+3. Haz clic en **"Crear y enviar invitación"**
+4. El usuario queda **"✉ Invitado"** y recibe un correo para definir su propia contraseña (válido 72 horas); podrá iniciar sesión cuando la defina. Si no le llegó, usa **"Reenviar invitación"**
+
+### Restablecer la contraseña de un usuario
+Nadie más que el usuario conoce su contraseña. Si no puede entrar, haz clic en **"Enviar enlace para restablecer contraseña"** en su fila: le llega a su correo un enlace de un solo uso, válido 60 minutos. También puede pedirlo él mismo con **"¿Olvidaste tu contraseña?"** en el inicio de sesión.
 
 ### Cambiar el rol de un usuario
 1. Busca el usuario en la lista
@@ -36,14 +39,14 @@ El sistema tiene tres roles:
 
 **Implicaciones del cambio de rol:**
 - USER → MANAGER: obtiene EDIT_TICKET, CHANGE_STATUS, UPLOAD_ATTACHMENT, DELETE_ATTACHMENT, VIEW_TICKET_EVENTS, VIEW_DASHBOARD, REVIEW_DRAFTS
-- MANAGER → ADMIN: obtiene ARCHIVE_TICKET, MANAGE_USERS, MANAGE_CLASSIFICATIONS, MANAGE_WORKFLOW + todas las transiciones de estado
-- ADMIN → MANAGER: pierde los 4 permisos exclusivos de Admin y la transición ABIERTO→CERRADO
+- MANAGER → ADMIN: obtiene ARCHIVE_TICKET, MANAGE_USERS, MANAGE_CLASSIFICATIONS y MANAGE_WORKFLOW
+- ADMIN → MANAGER: pierde los 4 permisos exclusivos de Admin (las transiciones no dependen del rol)
 
 ### Desactivar un usuario
 Cuando un usuario deja de tener acceso (por ejemplo, un empleado que se va de la empresa):
-1. Edita el usuario
-2. Marca como inactivo
-3. Guarda
+1. Busca el usuario en la lista
+2. Haz clic en **"Desactivar"** y confirma
+3. Ya no podrá iniciar sesión y sus sesiones abiertas terminan en menos de un minuto
 
 **Antes de desactivar:** reasigna manualmente los tickets que tiene asignados. El sistema no los reasigna automáticamente.
 
@@ -51,7 +54,7 @@ Cuando un usuario deja de tener acceso (por ejemplo, un empleado que se va de la
 
 ## 2. Gestión de áreas y categorías
 
-**Pantalla:** 🏷️ Áreas y categorías (`screen: classificationManagement`)
+**Pantalla:** Áreas y categorías, en el menú de la izquierda (`screen: classificationManagement`)
 **Permiso requerido:** MANAGE_CLASSIFICATIONS ("Gestionar áreas y categorías")
 
 El catálogo tiene dos niveles: el **área** (por ejemplo, IT) y la **categoría** dentro de ella (por ejemplo, impresora). El clasificador automático de correos asigna cada ticket a un área y una categoría de este catálogo.
@@ -91,8 +94,8 @@ No puede haber dos áreas con el mismo nombre, aunque solo cambien las mayúscul
 Dentro de un área tampoco puede haber dos categorías con el mismo nombre ignorando mayúsculas.
 
 ### Editar un área o una categoría
-- **Área:** haz clic en ✏️ para cambiar nombre, descripción o color y presiona **"Guardar"**. El nuevo nombre se ve en todos los tickets que ya la tienen
-- **Categoría:** haz clic en ✏️ dentro del chip, escribe el nuevo nombre y presiona Enter (Escape cancela)
+- **Área:** haz clic en el lápiz para cambiar nombre, descripción o color y presiona **"Guardar"**. El nuevo nombre se ve en todos los tickets que ya la tienen
+- **Categoría:** haz clic en el lápiz dentro del chip, escribe el nuevo nombre y presiona Enter (Escape cancela)
 - El color del área se muestra como un punto en las tarjetas del tablero, en la lista y en el detalle del ticket
 
 ### Desactivar un área o una categoría
@@ -108,47 +111,37 @@ Dentro de un área tampoco puede haber dos categorías con el mismo nombre ignor
 
 ## 3. Configuración del workflow
 
-**Pantalla:** Configuración de Workflow (accesible desde Configuración del sistema)
+**Pantalla:** "⚙️ Gestión de Workflow" ("Workflow" en el menú de la izquierda; tiene ayuda "?")
 **Permiso requerido:** MANAGE_WORKFLOW
 
-**Advertencia crítica antes de modificar el workflow:** cualquier cambio afecta a todos los tickets activos en tiempo real. Planifica cambios en horario de baja actividad y notifica al equipo.
+El workflow define por qué estados pasa un ticket y a quién se le informa. Se aplica a todos los tickets de la organización, también a los que llegan por correo.
 
-### Estados configurables
+### Estados
 
-Por cada estado (OPEN, IN_PROGRESS, IN_REVIEW, CLOSED) puedes modificar:
+Cada estado tiene un nombre que eliges y una categoría fija que entiende el sistema: Nuevo, En curso, En espera o Cerrado (Resuelto o Cancelado). Las métricas, los filtros y el cierre siguen la categoría (ver "Estados y transiciones — Admin").
 
-| Campo | Descripción | Impacto del cambio |
-|---|---|---|
-| name | Nombre visible en la UI | Cambio cosmético, no afecta datos |
-| description | Descripción del estado | Solo informativo |
-| color | Color hex en la interfaz | Cambio cosmético |
-| notifyRequester | Si notifica al solicitante al entrar a este estado | Activa/desactiva notificaciones automáticas |
-| position | Orden de visualización | Solo afecta la presentación |
+1. **"+ Nuevo estado":** nombre, categoría, resultado (solo Cerrado), descripción y color.
+2. **"Editar":** nombre, descripción y color; **↑/↓** cambia el orden de las columnas del tablero.
+3. **"Hacer inicial":** elige el estado de categoría Nuevo donde entran los tickets nuevos.
+4. **"Desactivar":** mueve los tickets del estado al que elijas (sin correo a los solicitantes) y lo desactiva; **"Activar"** lo vuelve a usar.
 
-**Campos que NO debes cambiar:** isInitial e isTerminal — cambiarlos podría romper la lógica de creación y cierre de tickets.
+### Transiciones
 
-### Transiciones configurables
+Cada interruptor activa o desactiva un movimiento de un estado a otro (desde el tablero o el detalle) y se aplica de inmediato para todos. Una transición que sale de un estado Cerrado permite reabrir. La pantalla rechaza los cambios que dejan un estado sin camino a un estado Cerrado y muestra la regla que se rompería.
 
-Por cada transición puedes modificar:
+La pantalla no muestra ni edita un rol requerido por transición: cualquier rol con el permiso "Cambiar estado" puede ejecutar las transiciones activas.
 
-| Campo | Descripción | Impacto |
-|---|---|---|
-| fromState | Estado de origen | Cambia el mapa del workflow |
-| toState | Estado de destino | Cambia el mapa del workflow |
-| requiredRole | NULL / MANAGER / ADMIN | Cambia quién puede ejecutar la transición |
-| description | Descripción de la transición | Solo informativo |
+Transiciones de fábrica: Abierto → En progreso, Abierto → Cerrado, En progreso → En revisión, En revisión → En progreso y En revisión → Cerrado.
 
-**Ejemplo de uso:** si quieres que los Managers también puedan cerrar tickets directamente desde ABIERTO (en lugar de solo el Admin), cambia el `requiredRole` de la transición OPEN→CLOSED de `ADMIN` a `NULL`.
+### Notificaciones
 
-### Configuración actual de transiciones
+La pantalla **Notificaciones** es la lista completa de lo que puede recibir el solicitante por correo; lo que no esté encendido no se envía:
+- **Avisos por tipo de evento:** "Creación", "Asignación" y "Comentario".
+- **Cambio de estado: avisar al entrar a…:** un interruptor por estado; se avisa cuando el ticket entra a ese estado.
 
-| De | A | Rol requerido | Descripción |
-|---|---|---|---|
-| OPEN | IN_PROGRESS | NULL | Cualquier rol con CHANGE_STATUS |
-| IN_PROGRESS | IN_REVIEW | NULL | Cualquier rol con CHANGE_STATUS |
-| IN_REVIEW | IN_PROGRESS | NULL | Regresión si hay problemas |
-| IN_REVIEW | CLOSED | MANAGER | Solo Manager o Admin cierran |
-| OPEN | CLOSED | ADMIN | Cierre directo, exclusivo Admin |
+Siempre hace falta que el ticket tenga activados los avisos al solicitante y que este tenga correo. Nunca se notifican las correcciones (solicitante, fecha límite, área/categoría), los adjuntos, los movimientos al desactivar un estado ni lo que el solicitante agrega al responder el correo. Una organización nueva solo avisa la **creación** y la **entrada a un estado Cerrado**.
+
+**Precaución:** apagar "Creación" silencia los correos de creación, también los de tickets que llegan por correo.
 
 ---
 
@@ -195,6 +188,19 @@ Además de aprobar borradores (igual que Manager), Admin puede **eliminarlos**.
 **Resultado:** `isArchived = true`. El ticket deja de aparecer en búsquedas y listas normales pero permanece en la base de datos.
 
 **Para ver tickets archivados:** en la lista principal activa el filtro **"Incluir archivados"** (si está disponible en la interfaz) o consulta directamente en la base de datos.
+
+---
+
+## 7. Canales de entrada (📨 Canales)
+
+Los **canales** son los buzones de correo de tu organización desde los que se crean tickets automáticamente. Los da de alta tu proveedor; tú no ves sus llaves ni puedes crearlos o borrarlos.
+
+En **📨 Canales** ves, por buzón: su estado (Activo, Pausado o Deshabilitado), el último mensaje recibido, cuántos están en proceso, los errores y la hora del último reporte del clasificador (en rojo si lleva más de 15 minutos sin reportar).
+
+- **Pausar:** los correos nuevos de ese buzón no se convierten en tickets y quedan sin leer hasta que lo reanudes.
+- **Reanudar:** vuelve a crear tickets con los correos pendientes.
+
+Los tickets que llegan de un canal muestran en su detalle **Origen: ✉ canal (buzón)**, y el remitente queda como solicitante con medio "Correo".
 
 ---
 

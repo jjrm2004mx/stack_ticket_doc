@@ -15,19 +15,19 @@ Definiciones de todos los términos que aparecen en el sistema de tickets.
 Registro formal de una solicitud, problema o tarea dentro del sistema. Cada ticket tiene un identificador único, un estado, y un responsable asignado. Es la unidad básica de trabajo del sistema.
 
 **Estado**
-Indica en qué etapa del proceso se encuentra un ticket. Los cuatro estados posibles son: Abierto, En Progreso, En Revisión y Cerrado. Solo el equipo (Manager o Admin) puede cambiar el estado.
+Indica en qué etapa del proceso se encuentra un ticket. Los nombres los define tu organización (de fábrica: Abierto, En progreso, En revisión y Cerrado) y cada estado pertenece a una categoría: Nuevo, En curso, En espera o Cerrado. Solo los roles con "Cambiar estado" pueden cambiarlo.
 
-**Abierto (OPEN)**
-Estado inicial de todo ticket recién creado. Significa que está registrado y esperando ser atendido.
+**Estado inicial**
+Donde empieza todo ticket recién creado (de fábrica, "Abierto"). Significa que está registrado y esperando ser atendido.
 
-**En Progreso (IN_PROGRESS)**
-El equipo está trabajando activamente en el ticket. Ya tiene una persona asignada.
+**En curso**
+Categoría de los estados en los que el equipo trabaja el ticket (de fábrica, "En progreso" y "En revisión").
 
-**En Revisión (IN_REVIEW)**
-El trabajo está terminado o casi terminado y se está verificando antes del cierre. Puede requerir tu confirmación.
+**En espera**
+Categoría de los estados en los que se espera a un tercero, por ejemplo al cliente. Mientras tanto la fecha límite se pausa ("⏸") y al salir se recorre los días que esperó.
 
-**Cerrado (CLOSED)**
-Estado final e irreversible. El ticket fue resuelto. No se puede reabrir — si el problema persiste, se crea un ticket nuevo.
+**Cerrado**
+Categoría de los estados finales, con resultado Resuelto o Cancelado. Un ticket cerrado ya no se edita; solo se reabre si tu organización lo permite.
 
 **Prioridad**
 Nivel de urgencia del ticket. Tiene cuatro niveles:
@@ -36,13 +36,6 @@ Nivel de urgencia del ticket. Tiene cuatro niveles:
 - `Alta`: afecta el trabajo, necesita atención pronta
 - `Crítica`: bloqueante total, atención inmediata requerida
 
-**Tipo de ticket**
-Indica el tipo de solicitud:
-- `Tarea (TASK)`: algo que necesitas que se haga
-- `Bug (BUG)`: algo que no funciona correctamente
-- `Feature (FEATURE)`: solicitud de mejora o nueva funcionalidad
-- `Documentación (DOCS)`: solicitud de información o documentación
-
 **Asignado a**
 Persona del equipo responsable de resolver el ticket. Un ticket puede no tener asignación inicial y ser asignado después.
 
@@ -50,7 +43,10 @@ Persona del equipo responsable de resolver el ticket. Un ticket puede no tener a
 Usuario que abrió el ticket. En tu caso, siempre serás tú.
 
 **Solicitante (Requester)**
-Persona que originó la solicitud. Cuando creas un ticket directamente, eres tú. Cuando un ticket llega por correo electrónico, el solicitante es quien envió el correo.
+Persona a nombre de quien se crea el ticket (por ejemplo, un cliente que llamó). Quien crea el ticket nunca es el solicitante. Cuando un ticket llega por correo electrónico, el solicitante es quien envió el correo. Recibe los avisos del ticket solo si tiene correo y la casilla "Enviar notificaciones al solicitante" está marcada.
+
+**Medio**
+Por dónde llegó la solicitud: Teléfono, Presencial, Correo, Chat u Otro.
 
 **Comentario**
 Mensaje agregado al ticket por cualquier participante. Sirve para comunicarse, dar información adicional o hacer seguimiento. Todos los comentarios quedan registrados con fecha y autor.
@@ -74,7 +70,7 @@ Primer nivel del catálogo: el área a la que pertenece el ticket. Las áreas di
 Segundo nivel del catálogo, dentro de un área. Por ejemplo, dentro de IT puedes tener categorías como "hardware", "red" o "acceso".
 
 **Fecha límite (Due Date)**
-Fecha en la que necesitas que el ticket esté resuelto. Es opcional al crear el ticket. El equipo la usa para priorizar el trabajo.
+Fecha en la que necesitas que el ticket esté resuelto. Es opcional al crear el ticket y no puede ser anterior a hoy. Se usa para medir el cumplimiento de SLA y marcar vencidos; quien tenga "Editar tickets" puede cambiarla o quitarla desde el detalle.
 
 **Horas estimadas**
 Estimación del tiempo que tomará resolver el ticket. Lo define el equipo, no el usuario.

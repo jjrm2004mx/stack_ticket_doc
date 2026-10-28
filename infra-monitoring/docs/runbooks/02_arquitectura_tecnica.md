@@ -47,11 +47,11 @@ Loki y Promtail están fijados en `2.9.0` por compatibilidad de API — no actua
 # En docker-compose.yml — todas externas, creadas por startup.sh
 networks:
   observability-network:
-    external: true    # 10.89.3.0/24
+    external: true
   ticket-management-network:
-    external: true    # 10.89.1.0/24
+    external: true
   ticket-classification-network:
-    external: true    # 10.89.2.0/24
+    external: true
 ```
 
 Todos los servicios de este stack están en `observability-network`.
@@ -59,15 +59,10 @@ Prometheus también está en `ticket-management-network` y
 `ticket-classification-network` para alcanzar los endpoints de métricas
 de los otros repos.
 
-### Subnets fijas
+### Subredes
 
-| Red | Subred | Por qué fija |
-|---|---|---|
-| `ticket-management-network` | 10.89.1.0/24 | Evita conflictos con otras redes Podman |
-| `ticket-classification-network` | 10.89.2.0/24 | Idem |
-| `observability-network` | 10.89.3.0/24 | Idem |
-
-Si Podman asigna subnets automáticas pueden colisionar con la red del host WSL.
+Las tres redes compartidas se crean sin subred fija: Podman asigna una libre y nada
+depende de ella. Subredes reales en Rocky: `11_puertos_y_redes.md` §3.
 Por eso startup.sh las crea con subnets explícitas.
 
 ---
@@ -91,7 +86,7 @@ PORTAL_PORT=8090
 
 ```bash
 TICKET_MGMT_API_URL=http://ticket-system-backend:8080/api/v1
-NOTIFICATION_WEBHOOK_URL=http://til-n8n:5678/webhook/notification-webhook
+NOTIFICATION_WEBHOOK_URL=http://til-n8n:5678/webhook/send-email
 APP_PUBLIC_URL=http://localhost:8090
 ```
 
@@ -227,9 +222,9 @@ Grafana lee estos archivos al iniciar — no requiere configuración manual.
 1. detect-environment.sh → detecta WSL vs Linux, IP del host
 2. Escribe ~/stack_ticket/.env.deploy con APP_PUBLIC_URL
 3. Crea redes Podman (si no existen):
-   - podman network create --subnet 10.89.1.0/24 ticket-management-network
-   - podman network create --subnet 10.89.2.0/24 ticket-classification-network
-   - podman network create --subnet 10.89.3.0/24 observability-network
+   - podman network create ticket-management-network
+   - podman network create ticket-classification-network
+   - podman network create observability-network
 4. cd ticket-classification  → ./start.sh
 5. cd ticket-management      → ./start.sh
 6. cd notification-service   → ./start.sh

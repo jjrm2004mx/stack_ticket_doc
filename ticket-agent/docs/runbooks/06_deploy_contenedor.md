@@ -26,7 +26,7 @@ Aplica tanto a entorno local WSL como a servidor Unix nativo.
 podman network ls | grep ticket-management-network
 
 # Crear si no existe (la crea infra-monitoring/startup.sh en el stack completo)
-podman network create --subnet 10.89.1.0/24 ticket-management-network
+podman network create ticket-management-network
 ```
 
 ### 2. Configurar `.env`
@@ -142,7 +142,7 @@ curl http://localhost:8002/api/v1/info
 ## Deploys subsecuentes (tras cambios de código)
 
 ```bash
-cd ~/stack_ticket/ticket-agent
+cd ~/stack_agent/ticket-agent
 bash sync-repos.sh
 podman-compose down
 podman build --no-cache -t ticket-agent .
@@ -161,7 +161,7 @@ Al migrar de WSL a un servidor Linux real, ajustar:
 | Usuario del host | `jjrm` | `ubuntu`, `ec2-user`, etc. |
 | Path `key_file` en `config.container` | `/home/jjrm/.oci/...` → genera `/root/.oci/...` | `/home/<usuario>/.oci/...` → genera `/root/.oci/...` |
 | `ORACLE_CONFIG_DIR` en `.env` | `/root/.oci/wallet_ticketagent` (ruta contenedor) | igual — el mount siempre llega a `/root/.oci/` |
-| Ollama | `host.containers.internal:11434` | mismo (si Ollama corre en el host) |
+| Ollama | `ollama:11434` uniendo `ticket-agent` a `ticket-classification-network` (solo `PROVIDER=ollama`) | igual |
 | Red | crear manual o via `infra-monitoring/startup.sh` | igual |
 | `N8N_SECURE_COOKIE` | `false` (HTTP local) | `true` si hay HTTPS |
 
@@ -184,5 +184,5 @@ Al migrar de WSL a un servidor Linux real, ajustar:
 | `Oracle: error de conexión` o `tnsnames.ora is missing` | `ORACLE_CONFIG_DIR`/`ORACLE_WALLET_DIR` con ruta del host en lugar de la del contenedor | En `.env` usar `/root/.oci/wallet_ticketagent` (no `/home/jjrm/...`) |
 | `key_file invalid path` | `config.container` no creado o con paths del host | Crear `~/.oci/config.container` con rutas `/root/.oci/` |
 | `Application startup failed` en bucle | Ver logs completos — error en lifespan | `podman logs ticket-agent 2>&1 \| head -60` |
-| Contenedor no aparece en `podman ps` | La red `ticket-management-network` no existe | `podman network create --subnet 10.89.1.0/24 ticket-management-network` |
+| Contenedor no aparece en `podman ps` | La red `ticket-management-network` no existe | `podman network create ticket-management-network` |
 | `torch` descarga paquetes CUDA en el build | `sentence-transformers` arrastra torch+CUDA | El `Dockerfile` ya pre-instala torch CPU-only — no modificar el orden |

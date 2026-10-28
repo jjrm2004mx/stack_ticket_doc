@@ -12,46 +12,46 @@ Definiciones de todos los términos del sistema con contexto técnico y de negoc
 ---
 
 **Ticket**
-Registro formal de una solicitud, problema o tarea. Modelo central del sistema. Campos clave: `id` (UUID), `title`, `description`, `status`, `priority`, `type`, `createdBy`, `assignedTo`, `createdAt`, `updatedAt`, `resolvedAt`, `resolvedBy`, `isArchived`, `isDraft`, `classificationId`, `categoryId`, `requesterEmail`, `requesterName`.
+Registro formal de una solicitud, problema o tarea. Modelo central del sistema. Campos clave: `id` (UUID), `title`, `description`, `status`, `priority`, `type`, `createdBy`, `assignedTo`, `createdAt`, `updatedAt`, `closedAt`, `closedBy`, `closedOutcome`, `isArchived`, `isDraft`, `classificationId`, `categoryId`, `requesterEmail`, `requesterName`.
 
-**Status (Estado)**
-Enum con cuatro valores: OPEN, IN_PROGRESS, IN_REVIEW, CLOSED. Campo `status` en el modelo Ticket. Puede ser NULL cuando el ticket es un borrador.
+**Estado**
+Etapa del ticket en el workflow de la organización. Cada estado tiene un nombre libre, un código técnico fijo (`status` en la API, por ejemplo `OPEN`) y una categoría del sistema: Nuevo, En curso, En espera o Cerrado (con resultado Resuelto o Cancelado). El comportamiento sigue la categoría. Es nulo cuando el ticket es un borrador.
 
 **isDraft**
-Campo derivado del modelo Ticket. Es `true` cuando `status == null`. No es un valor del enum Status sino una condición especial que indica que el ticket no ha entrado al flujo normal. Los borradores se gestionan en la pantalla de Revisión de Borradores.
+Campo derivado del modelo Ticket. Es `true` cuando `status == null`. No es un estado sino una condición especial que indica que el ticket no ha entrado al flujo normal. Los borradores se gestionan en la pantalla de Revisión de Borradores.
 
 **isArchived**
-Campo booleano del ticket (`false` por defecto). Cuando es `true`, el ticket está oculto de vistas normales. Solo Admin puede cambiarlo. Diferente al cierre: un ticket puede estar ABIERTO y archivado simultáneamente.
+Campo booleano del ticket (`false` por defecto). Cuando es `true`, el ticket está oculto de vistas normales. Solo Admin puede cambiarlo. Diferente al cierre: un ticket archivado conserva su estado y ya no cambia de estado ni se edita.
 
 **Estado inicial (isInitial)**
-Estado con el que comienzan todos los tickets: OPEN. Definido en la entidad `WorkflowStateEntity` y en la tabla `workflow_states`.
+Estado donde empiezan todos los tickets nuevos (portal, correo y borradores aprobados). Debe ser de categoría Nuevo; se elige con "Hacer inicial" en "⚙️ Gestión de Workflow".
 
-**Estado terminal (isTerminal)**
-Estado del que no hay transiciones de salida: CLOSED. Una vez que un ticket llega a CLOSED, no puede cambiar de estado bajo ninguna circunstancia ni con ningún rol.
+**Categoría Cerrado (isTerminal)**
+Un ticket está cerrado si su estado es de categoría Cerrado, sea cual sea su nombre. `isTerminal` es un valor derivado de la categoría. Se puede reabrir si la organización habilitó una transición que salga de ese estado.
 
 **Transición (WorkflowTransition)**
 Cambio permitido de un estado a otro. Definida en la tabla `workflow_transitions` con campos: `fromState`, `toState`, `requiredRole` (nullable), `description`. El servicio `TicketService.changeStatus()` valida que la transición exista en la base de datos antes de ejecutarla.
 
 **requiredRole**
-Campo de una transición que define qué rol puede ejecutarla. Valores: `NULL` (cualquier rol con CHANGE_STATUS), `MANAGER` (Manager o Admin), `ADMIN` (solo Admin). Configurable desde la pantalla de workflow.
+Columna de `workflow_transitions` (valores de fábrica: `NULL`, `MANAGER`, `ADMIN`). **No se aplica**: cualquier rol con CHANGE_STATUS ejecuta las transiciones activas. La pantalla de workflow no la muestra ni la edita, y al reactivar una transición queda en `NULL`.
 
-**resolvedAt / resolvedBy**
-Campos del ticket que se rellenan automáticamente cuando el ticket pasa a estado CLOSED. `resolvedAt` es la fecha/hora exacta, `resolvedBy` es el UUID del usuario que ejecutó el cierre.
+**closedAt / closedBy / closedOutcome**
+Datos de cierre: se guardan al entrar a un estado Cerrado (fecha, usuario y resultado Resuelto o Cancelado) y se limpian al reabrir.
 
 **Borrador (Draft)**
 Ticket con `status = NULL`. Creado por el sistema de ingesta automática (ticket-ingestion-light/n8n) cuando procesa correos entrantes que necesitan revisión humana. Los borradores están en la tabla `tickets` con `status_id = NULL`. Manager puede aprobarlos; Admin puede aprobarlos o eliminarlos.
 
 **approveDraft()**
-Método en `TicketService` (línea 61) que activa un borrador: cambia el status de NULL a OPEN, aplica los campos editados en la revisión (prioridad, área, categoría, asignado), y registra la acción. Requiere permiso REVIEW_DRAFTS.
+Método en `TicketService` (línea 61) que activa un borrador: pasa el ticket al estado inicial de la organización, aplica los campos editados en la revisión (prioridad, área, categoría, asignado), y registra la acción. Requiere permiso REVIEW_DRAFTS.
 
 **WorkflowState**
-Entidad persistida en la tabla `workflow_states`. Representa un estado del sistema con toda su configuración: nombre, descripción, color, isInitial, isTerminal, position, notifyRequester. Cada workflow_state tiene un `id` UUID que es referenciado por los tickets.
+Entidad persistida en la tabla `workflow_states`. Representa un estado del workflow de una organización: código, nombre, descripción, color, categoría, resultado, isInitial, isActive, position y notifyRequester. Cada workflow_state tiene un `id` entero que referencian los tickets (`status_id`). Los estados no se borran: se desactivan moviendo sus tickets a otro estado.
 
 **WorkflowTransition**
 Entidad persistida en `workflow_transitions`. Representa una transición válida entre dos WorkflowStates. Campos: `fromState` (FK), `toState` (FK), `requiredRole`, `description`.
 
 **notifyRequester**
-Campo booleano de WorkflowState. Si es `true`, el sistema envía una notificación automática al solicitante del ticket cuando este entra a ese estado. Configurable por Admin.
+Campo booleano de WorkflowState ("Avisar al entrar"). Si es `true`, el solicitante recibe correo cuando el ticket entra a ese estado, siempre que el ticket tenga activados los avisos al solicitante y este tenga correo. La creación, la asignación y los comentarios tienen sus propios interruptores. Configurable por Admin en "⚙️ Gestión de Workflow" › Notificaciones.
 
 **Action (Permiso)**
 Enum con 15 valores que representan las acciones posibles en el sistema: VIEW_TICKETS, CREATE_TICKET, EDIT_TICKET, CHANGE_STATUS, ARCHIVE_TICKET, ADD_COMMENT, VIEW_ATTACHMENTS, UPLOAD_ATTACHMENT, DELETE_ATTACHMENT, VIEW_TICKET_EVENTS, VIEW_DASHBOARD, MANAGE_USERS, REVIEW_DRAFTS, MANAGE_CLASSIFICATIONS, MANAGE_WORKFLOW.
@@ -107,11 +107,11 @@ Tabla de auditoría más amplia que registra cualquier cambio en el ticket: `eve
 **Priority**
 Enum con cuatro valores: BAJA, MEDIA, ALTA, CRITICA. Campo `priority` del ticket.
 
-**TicketType**
-Enum de tipo de ticket: TASK, BUG, FEATURE, DOCS.
-
 **dueDate**
-Fecha límite del ticket (LocalDate). Opcional. Usada para priorización del equipo.
+Fecha límite del ticket (LocalDate). Opcional; no puede ser anterior a hoy (zona `app.timezone`, por defecto America/Mexico_City). Alimenta el SLA y los vencidos del dashboard.
+
+**notifyRequester / contactMedium**
+Avisos al solicitante del ticket (casilla; siempre falsa sin correo) y medio por el que llegó (PHONE, IN_PERSON, EMAIL, CHAT, OTHER). Se notifica solo si el estado avisa, la casilla está marcada y hay correo; REQUESTER_CHANGED y DUE_DATE_CHANGED nunca se notifican.
 
 **estimatedHours / actualHours**
 Campos de esfuerzo del ticket (Double). `estimatedHours` es la estimación; `actualHours` es el tiempo real registrado al cierre.

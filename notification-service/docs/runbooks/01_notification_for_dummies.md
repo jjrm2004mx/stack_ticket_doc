@@ -44,7 +44,8 @@ notification-service :8081  ◀── aquí vive este repo
           │
           ▼
      til-n8n (ticket-ingestion-light)
-     └─ Webhook recibido → envía el correo real por Gmail
+     └─ Webhook recibido → envía el correo real por Microsoft Graph
+        (desde el buzón del canal del ticket, o desde la plataforma si no tiene canal)
 ```
 
 ---
@@ -52,13 +53,14 @@ notification-service :8081  ◀── aquí vive este repo
 ## El flujo de una notificación
 
 ```
-1. Operador cambia estado de un ticket en ticket-management
+1. Operador cambia estado de un ticket en ticket-management (solo se avisa lo que el
+   admin encendió en Notificaciones; ver troubleshooting §0)
 2. Backend publica evento en Redis Stream "ticket.events"
 3. notification-service detecta el evento (consumer group)
 4. Selecciona la plantilla Thymeleaf según tipo de evento
 5. Genera HTML del correo con datos del ticket
 6. POST al webhook URL (til-n8n) con el HTML generado
-7. n8n recibe el webhook y lo envía por Gmail al solicitante
+7. n8n recibe el webhook y lo envía por Microsoft Graph al solicitante
 8. notification-service registra el envío en notification-db
 ```
 

@@ -12,16 +12,16 @@ Definiciones completas de todos los términos del sistema, con contexto específ
 ---
 
 **Ticket**
-Registro formal de una solicitud, problema o tarea. Cada ticket tiene: identificador único (UUID), estado, prioridad, tipo, asignado, creador, área y categoría. Es la unidad central del sistema.
+Registro formal de una solicitud, problema o tarea. Cada ticket tiene: identificador único (UUID), estado, prioridad, asignado, creador, solicitante, área y categoría. Es la unidad central del sistema.
 
 **Estado (Status)**
-Etapa actual del ticket en el flujo de trabajo. Los cuatro estados son: OPEN (Abierto), IN_PROGRESS (En Progreso), IN_REVIEW (En Revisión), CLOSED (Cerrado). Como Manager puedes cambiar entre todos excepto la transición directa ABIERTO→CERRADO.
+Etapa actual del ticket en el workflow de tu organización. Cada estado tiene un nombre que eligió la organización y una categoría: Nuevo, En curso, En espera o Cerrado (Resuelto o Cancelado). Con "Cambiar estado" puedes mover el ticket por las transiciones configuradas.
 
 **Estado inicial**
-OPEN (Abierto) — todos los tickets nuevos comienzan aquí automáticamente.
+El estado de categoría Nuevo donde empiezan todos los tickets nuevos (de fábrica, "Abierto").
 
-**Estado terminal**
-CLOSED (Cerrado) — no tiene transiciones de salida. Es irreversible.
+**Estado Cerrado**
+Cualquier estado de categoría Cerrado. Un ticket cerrado no se edita; se reabre solo si la organización configuró una transición que salga de ese estado.
 
 **Transición**
 Cambio de un estado a otro. El sistema valida que la transición sea permitida antes de ejecutarla. Las transiciones están definidas en la tabla `workflow_transitions` de la base de datos.
@@ -36,7 +36,7 @@ Registro de cualquier acción realizada sobre el ticket: cambio de estado, edici
 Ticket sin estado activo (`status = NULL`). Creado automáticamente cuando llega un ticket por correo electrónico y necesita revisión humana. No aparece en el flujo normal hasta ser aprobado. Como Manager eres responsable de revisarlos y aprobarlos.
 
 **Aprobar borrador**
-Acción que activa un borrador y lo convierte en ticket ABIERTO. Al aprobar, el ticket entra al flujo normal con la prioridad, el área, la categoría y la asignación que definiste en la revisión.
+Acción que activa un borrador: el ticket entra al estado inicial de la organización. Al aprobar, el ticket entra al flujo normal con la prioridad, el área, la categoría y la asignación que definiste en la revisión.
 
 **REVIEW_DRAFTS**
 Permiso que permite revisar y aprobar borradores. Activo por defecto para Manager.
@@ -48,20 +48,17 @@ Urgencia del ticket:
 - `ALTA` — afecta el trabajo, atención pronta
 - `CRÍTICA` — bloqueante total, atención inmediata
 
-**Tipo de ticket**
-- `TASK` (Tarea) — acción a realizar
-- `BUG` — problema o falla
-- `FEATURE` — solicitud de mejora
-- `DOCS` — solicitud de documentación
-
 **Asignado a (assignedTo)**
 Usuario del equipo responsable de resolver el ticket. Campo UUID que referencia a un usuario del sistema. Como Manager puedes asignar y reasignar tickets.
 
 **Solicitante (Requester)**
-Persona que originó la solicitud. Puede ser un Usuario interno (`createdBy`) o un solicitante externo identificado por email (`requesterEmail`) cuando el ticket llegó por correo.
+Persona a nombre de quien se crea el ticket (por ejemplo, un cliente que llamó o escribió). Quien crea el ticket (`createdBy`) nunca es el solicitante. Si el ticket llegó por correo, el solicitante es el remitente.
 
 **requesterEmail / requesterName**
-Campos del ticket que identifican al solicitante externo cuando el ticket fue creado por integración de correo (no por un usuario interno del sistema).
+Nombre y correo del solicitante. Se capturan al crear el ticket en el portal o vienen del correo; con "Editar tickets" se corrigen desde el detalle (evento "Solicitante actualizado"). Cambiar el solicitante no cambia quién ve el ticket.
+
+**notifyRequester / contactMedium**
+Casilla "Enviar notificaciones al solicitante" (solo con correo) y medio por el que llegó la solicitud (Teléfono, Presencial, Correo, Chat, Otro). Se avisa al solicitante solo si el estado del ticket envía avisos, la casilla está marcada y hay correo. Las correcciones de solicitante y fecha límite nunca se notifican.
 
 **Adjunto (Attachment)**
 Archivo vinculado a un ticket. Límite: 10 MB por archivo. Como Manager puedes ver, descargar, subir y eliminar adjuntos. La eliminación es irreversible.
@@ -94,7 +91,7 @@ Segundo nivel del catálogo, dentro de un área. Ejemplo: dentro de IT existen h
 Campos del ticket que guardan el área/categoría sugerida por el clasificador cuando no encontró una coincidencia exacta en el catálogo. Útil para revisar borradores y entender la intención original del clasificador.
 
 **Fecha límite (dueDate)**
-Fecha de resolución esperada del ticket. Configurable al crear o editar. Usada para priorización.
+Fecha de resolución esperada del ticket. Se define al crear o desde el detalle (evento "Fecha límite cambiada"); no puede ser anterior a hoy. Alimenta el cumplimiento de SLA y los vencidos del dashboard.
 
 **Horas estimadas (estimatedHours)**
 Estimación de esfuerzo para resolver el ticket. Campo editable por Manager.
@@ -102,14 +99,14 @@ Estimación de esfuerzo para resolver el ticket. Campo editable por Manager.
 **Horas reales (actualHours)**
 Tiempo efectivo de resolución. Campo editable por Manager al cerrar el ticket.
 
-**resolvedAt / resolvedBy**
-Campos que registran la fecha/hora de cierre y el usuario que cerró el ticket. Se rellenan automáticamente cuando el ticket pasa a CLOSED.
+**closedAt / closedBy / closedOutcome**
+Fecha, usuario y resultado (Resuelto o Cancelado) del cierre. Se guardan al entrar a un estado Cerrado y se limpian si el ticket se reabre.
 
 **CHANGE_STATUS**
-Permiso que permite ejecutar transiciones de estado. Activo para Manager con las restricciones de workflow definidas (no puede hacer ABIERTO→CERRADO).
+Permiso que permite ejecutar transiciones de estado. Permite mover tickets por las transiciones que configuró la organización; no hay restricciones por rol en las transiciones.
 
 **EDIT_TICKET**
-Permiso que permite modificar campos del ticket (título, descripción, prioridad, tipo, fecha límite, horas). Activo para Manager.
+Permiso que permite modificar campos del ticket (prioridad, fecha límite, solicitante, avisos, medio, área y categoría). Activo para Manager.
 
 **ARCHIVE_TICKET**
 Permiso para marcar un ticket como archivado (oculto de vistas normales). **No disponible para Manager** — exclusivo de Admin.

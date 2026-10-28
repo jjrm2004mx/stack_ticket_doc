@@ -1,7 +1,12 @@
 # 03 — Guía Operacional
 ## ticket-classification · Operaciones del día a día
-**Ruta raíz: `~/stack_ticket/ticket-classification`**
-**Mayo 2026**
+**Ruta raíz: `~/stack_ticket/ticket-classification` (Rocky)**
+**Octubre 2026**
+
+Arquitectura y respuestas de cada endpoint: [02_arquitectura_tecnica.md](02_arquitectura_tecnica.md).
+Mensajes retenidos: [09_bandeja_mensajes_retenidos.md](09_bandeja_mensajes_retenidos.md).
+Fallas: [troubleshooting.md](troubleshooting.md). Todos los puertos escuchan solo en
+`127.0.0.1`; desde otra máquina, túnel SSH (infra-monitoring `10_redes_y_acceso_lan.md` §7).
 
 ---
 
@@ -9,354 +14,202 @@
 
 1. [Regla de oro](#1-regla-de-oro)
 2. [Ciclo de vida del stack](#2-ciclo-de-vida-del-stack)
-3. [Verificación de salud del sistema](#3-verificación-de-salud-del-sistema)
+3. [Verificación de salud](#3-verificación-de-salud)
 4. [Probar el clasificador](#4-probar-el-clasificador)
-5. [Gestión de logs](#5-gestión-de-logs)
-6. [Base de datos — operaciones frecuentes](#6-base-de-datos--operaciones-frecuentes)
+5. [Logs](#5-logs)
+6. [Base de datos — consultas frecuentes](#6-base-de-datos--consultas-frecuentes)
 7. [Cambiar provider de IA](#7-cambiar-provider-de-ia)
-8. [Agregar o modificar dominios y categorías](#8-agregar-o-modificar-dominios-y-categorías)
-9. [Modo mock — desarrollo sin LLM](#9-modo-mock--desarrollo-sin-llm)
-10. [Ciclo de desarrollo — cambios en código](#10-ciclo-de-desarrollo--cambios-en-código)
-11. [Gestión de Ollama](#11-gestión-de-ollama)
-12. [Redis — caché y estado de jobs](#12-redis--caché-y-estado-de-jobs)
-13. [MinIO — adjuntos de correos](#13-minio--adjuntos-de-correos)
+8. [Áreas y categorías](#8-áreas-y-categorías)
+9. [Modo mock — pruebas sin LLM](#9-modo-mock--pruebas-sin-llm)
+10. [Desplegar cambios de código](#10-desplegar-cambios-de-código)
+11. [Ollama](#11-ollama)
+12. [Redis — cola de trabajo y caché](#12-redis--cola-de-trabajo-y-caché)
+13. [MinIO — archivos de los correos](#13-minio--archivos-de-los-correos)
 14. [Migraciones Flyway](#14-migraciones-flyway)
 15. [LangSmith — trazas del agente](#15-langsmith--trazas-del-agente)
-16. [Git — control de versiones](#16-git--control-de-versiones)
-17. [Troubleshooting](#17-troubleshooting)
-18. [Checklist de verificación diaria](#18-checklist-de-verificación-diaria)
+16. [Checklist diario](#16-checklist-diario)
 
 ---
 
 ## 1. Regla de oro
 
-> **Siempre ejecutar desde la raíz del repo:**
-> ```bash
-> cd ~/stack_ticket/ticket-classification
-> ```
-> Los servicios se comunican por nombre de contenedor (`langchain-api:8000`),
-> nunca por `localhost` dentro de los contenedores.
+> Ejecutar desde la raíz del repo: `cd ~/stack_ticket/ticket-classification`.
+> Para que `langchain-agent` tome un cambio del `.env` hay que correr **`bash start.sh`**:
+> `podman-compose restart` no relee el `.env` (el agente se crea con `podman run --env-file`).
 
 ---
 
 ## 2. Ciclo de vida del stack
 
-### Levantar — opción recomendada (ecosistema completo)
-
 ```bash
-# Levanta todos los repos en orden con las redes correctas
-bash ~/stack_ticket/infra-monitoring/startup.sh up
+bash ~/stack_ticket/infra-monitoring/startup.sh up       # todo el ecosistema, en orden
+bash ~/stack_ticket/ticket-classification/start.sh       # solo este repo (recrea todo)
+cd ~/stack_ticket/ticket-classification && podman-compose down   # apagar (datos se conservan)
+podman ps --format "table {{.Names}}\t{{.Status}}"
+podman stats --no-stream
 ```
 
-### Levantar — solo este repo
+**Nunca** `podman-compose down -v` sin respaldo: borra la bandeja (correos aún no entregados
+y los retenidos), Redis y MinIO.
 
-```bash
-# start.sh detecta si ticket-management está corriendo y configura la URL
-bash ~/stack_ticket/ticket-classification/start.sh
-```
-
-### Apagar este repo (datos se conservan)
-
-```bash
-cd ~/stack_ticket/ticket-classification
-podman-compose down
-```
-
-### Apagar y eliminar volúmenes (reset completo — PRECAUCIÓN)
-
-```bash
-cd ~/stack_ticket/ticket-classification
-# ⚠️ Borra datos de classifier-db, redis y minio
-podman-compose down -v
-```
-
-### Reiniciar un servicio específico
-
-```bash
-cd ~/stack_ticket/ticket-classification
-podman-compose restart langchain-agent   # Solo el agente
-podman-compose restart langchain-api     # Solo la API
-podman-compose restart classifier-db     # Solo la BD
-podman-compose restart ollama            # Solo Ollama
-```
-
-### Estado de contenedores
-
-```bash
-podman ps --format "table {{.Names}}\t{{.Status}}\t{{.Networks}}"
-podman stats --no-stream   # CPU y RAM en snapshot
-```
+`start.sh` se detiene si `CLASSIFIER_SERVICE_KEY` o `LANGCHAIN_INTERNAL_API_KEY` están vacías o
+con el valor de ejemplo.
 
 ---
 
-## 3. Verificación de salud del sistema
+## 3. Verificación de salud
 
 ```bash
-cd ~/stack_ticket/ticket-classification
+curl -s http://localhost:8001/health | python3 -m json.tool
+# "status":"ok", "agent_provider":"oci", "ticket_management":"ok" ("failing" = llave de servicio rechazada)
+curl -s http://localhost:8000/health | python3 -m json.tool
+# "default_provider":"oci", "redis":"ok"
+podman exec classifier-db pg_isready -U admin -d classifier_db
+podman exec classifier-redis sh -c 'redis-cli --no-auth-warning -a "$REDIS_PASSWORD" ping'
+curl -sf http://localhost:9000/minio/health/live && echo "MinIO OK"
 
-echo "════════════════════════════════════"
-echo "ESTADO — $(date)"
-echo "════════════════════════════════════"
-
-echo -e "\n── Contenedores ──"
-podman ps --format "table {{.Names}}\t{{.Status}}"
-
-echo -e "\n── Agente ──"
-curl -s http://localhost:8001/health | python3 -m json.tool 2>/dev/null || echo "NO RESPONDE"
-
-echo -e "\n── API (providers activos) ──"
-curl -s http://localhost:8000/health | python3 -m json.tool 2>/dev/null || echo "NO RESPONDE"
-
-echo -e "\n── PostgreSQL ──"
-podman exec classifier-db psql -U admin -d classifier_db -c "SELECT COUNT(*) FROM tickets;" -t \
-  && echo "classifier_db OK" || echo "classifier_db NO DISPONIBLE"
-
-echo -e "\n── Redis ──"
-podman exec classifier-redis redis-cli ping 2>/dev/null || echo "Redis NO DISPONIBLE"
-
-echo -e "\n── MinIO ──"
-curl -sf http://localhost:9000/minio/health/live && echo "MinIO OK" || echo "MinIO NO DISPONIBLE"
+# ¿Hay correos atorados? (todo lo que no está entregado)
+podman exec classifier-db psql -U admin -d classifier_db -c \
+  "SELECT state, count(*), max(last_error) FROM inbox_messages WHERE state <> 'DELIVERED' GROUP BY 1;"
 ```
 
 ---
 
 ## 4. Probar el clasificador
 
-El endpoint es **asíncrono**: `POST /process` devuelve un `job_id` y la
-clasificación se hace en background. Consultar el resultado con `GET /status/{job_id}`.
+Ya no existe un endpoint para mandar un correo "a mano": la bandeja solo acepta correos con la
+llave de un canal (`X-Channel-Key`), que ticket-management muestra una sola vez al crear el
+canal. Formas de probar:
 
-### Ticket de IT
+**a) De punta a punta (correo real)** — con la ingesta del canal activa, mandar un correo al
+buzón del canal y seguirlo (infra-monitoring `08_smoke_test_end_to_end.md`):
 
 ```bash
-# Paso 1 — enviar
-JOB=$(curl -s -X POST http://localhost:8001/process \
-  -H "Content-Type: application/json" \
-  -d '{
-    "asunto": "Servidor de producción no responde",
-    "cuerpo": "El servidor ERP no responde desde las 9am. Usuarios sin acceso.",
-    "remitente": "soporte@empresa.com",
-    "nombre_remitente": "Soporte TI",
-    "conversation_id": "TEST-IT-001"
-  }' | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])")
-echo "Job ID: $JOB"
-
-# Paso 2 — esperar y consultar (~25s Ollama, <5s cloud)
-sleep 30
-curl -s http://localhost:8001/status/$JOB | python3 -m json.tool
+podman exec classifier-db psql -U admin -d classifier_db -c \
+  "SELECT id, kind, state, ticket_id, fallback, last_error, held_reason, received_at
+     FROM inbox_messages ORDER BY created_at DESC LIMIT 5;"
 ```
 
-### Ticket de cliente
+**b) Solo el LLM** — `/ask` de `langchain-api` con la llave interna:
 
 ```bash
-JOB=$(curl -s -X POST http://localhost:8001/process \
-  -H "Content-Type: application/json" \
-  -d '{
-    "asunto": "Cargo duplicado en factura de marzo",
-    "cuerpo": "Mi factura tiene un cargo duplicado de $500. Por favor revisar.",
-    "remitente": "cliente@externo.com",
-    "nombre_remitente": "Cliente Externo",
-    "conversation_id": "TEST-CLI-001"
-  }' | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])")
-sleep 30 && curl -s http://localhost:8001/status/$JOB | python3 -m json.tool
+KEY=$(grep ^LANGCHAIN_INTERNAL_API_KEY= .env | cut -d= -f2)
+curl -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" -H "X-Api-Key: $KEY" \
+  -d '{"prompt": "Clasifica: el servidor de producción no responde desde las 9am"}' | python3 -m json.tool
 ```
 
-### Ticket con adjunto
+**c) Ver qué decidió para un correo** — clasificación y corridas del agente:
 
 ```bash
-JOB=$(curl -s -X POST http://localhost:8001/process \
-  -H "Content-Type: application/json" \
-  -d '{
-    "asunto": "Error en sistema de nómina",
-    "cuerpo": "El sistema no permite procesar pagos desde esta mañana.",
-    "remitente": "juan.perez@empresa.com",
-    "nombre_remitente": "Juan Pérez",
-    "conversation_id": "TEST-ADJ-001",
-    "adjuntos": [
-      {"nombre": "captura_error.png", "tipo": "image/png"}
-    ]
-  }' | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])")
-sleep 30 && curl -s http://localhost:8001/status/$JOB | python3 -m json.tool
-```
-
-### Probar con provider específico
-
-```bash
-JOB=$(curl -s -X POST http://localhost:8001/process \
-  -H "Content-Type: application/json" \
-  -d '{
-    "asunto": "Sistema de reportes sin actualizar",
-    "cuerpo": "El BI lleva 2 horas sin actualizar los dashboards.",
-    "remitente": "operaciones@empresa.com",
-    "nombre_remitente": "Operaciones BI",
-    "conversation_id": "TEST-OAI-001",
-    "provider": "openai"
-  }' | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])")
-sleep 10 && curl -s http://localhost:8001/status/$JOB | python3 -m json.tool
-```
-
-### Verificar deduplicación por conversation_id
-
-```bash
-# Enviar el mismo conversation_id dos veces
-JOB1=$(curl -s -X POST http://localhost:8001/process \
-  -H "Content-Type: application/json" \
-  -d '{"asunto":"Test dedup","cuerpo":"Primer envío","conversation_id":"DEDUP-001"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])")
-sleep 30
-
-JOB2=$(curl -s -X POST http://localhost:8001/process \
-  -H "Content-Type: application/json" \
-  -d '{"asunto":"Test dedup","cuerpo":"Segunda respuesta al mismo hilo","conversation_id":"DEDUP-001"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])")
-sleep 5
-
-# El segundo debe devolver status=ignorado
-curl -s http://localhost:8001/status/$JOB2 | python3 -m json.tool
+podman exec classifier-db psql -U admin -d classifier_db -c \
+  "SELECT m.subject, m.classification->>'area' AS area, m.classification->>'category' AS category,
+          m.classification->>'priority' AS priority, m.fallback, r.provider, r.duration_ms
+     FROM inbox_messages m LEFT JOIN agent_runs r ON r.message_id = m.id
+    ORDER BY m.created_at DESC LIMIT 5;"
 ```
 
 ---
 
-## 5. Gestión de logs
+## 5. Logs
 
 ```bash
-# Agente — tiempo real
-podman logs -f langchain-agent
-
-# API — tiempo real
+podman logs --tail 100 langchain-agent
 podman logs -f langchain-api
-
-# Últimas N líneas
-podman logs --tail 50 langchain-agent
-podman logs --tail 50 langchain-api
-
-# Flyway — ver resultado de migraciones
-podman logs classifier-flyway
-
-# Buscar errores en el agente
-podman logs langchain-agent 2>&1 | grep -i "error\|exception"
-
-# Buscar clasificaciones exitosas
-podman logs langchain-agent 2>&1 | grep "completado"
-
-# Todos los servicios en tiempo real
-podman-compose logs -f
+# Recorrido de los correos (eventos JSON):
+podman logs --since 1h langchain-agent 2>&1 | grep -E '"(inbox_received|inbox_classified|inbox_classify_retry|inbox_classify_fallback|inbox_delivered|inbox_delivery_retry|inbox_held)"'
+# Errores reales (sin el ruido de inbox_worker_error, ver troubleshooting)
+podman logs --since 1h langchain-agent 2>&1 | grep -i error | grep -v inbox_worker_error
 ```
+
+Grafana → Explore → Loki: `{container="langchain-agent"}`.
 
 ---
 
-## 6. Base de datos — operaciones frecuentes
-
-### Conectarse a classifier-db
+## 6. Base de datos — consultas frecuentes
 
 ```bash
-podman exec -it classifier-db psql -U admin -d classifier_db
-# Para salir: \q
-# Ver tablas: \dt
+podman exec -it classifier-db psql -U admin -d classifier_db      # \dt, \q
 ```
 
-### Consultas de operación
+```sql
+-- Correos por estado y canal
+SELECT channel_id, state, count(*) FROM inbox_messages GROUP BY 1, 2 ORDER BY 1, 2;
 
-```bash
-# Últimos 10 tickets clasificados
-podman exec classifier-db psql -U admin -d classifier_db -c "
-SELECT id, subject, domain, category, priority, confidence, created_at
-FROM tickets
-ORDER BY id DESC LIMIT 10;"
+-- Retenidos que esperan a una persona (ver 09)
+SELECT id, tenant_id, subject, held_reason, updated_at FROM inbox_messages
+ WHERE state = 'HELD' AND body_purged_at IS NULL ORDER BY updated_at;
 
-# Tickets del día por dominio
-podman exec classifier-db psql -U admin -d classifier_db -c "
-SELECT domain, priority, COUNT(*) AS total
-FROM tickets
-WHERE created_at >= CURRENT_DATE
-GROUP BY domain, priority
-ORDER BY domain, priority;"
+-- Entregados como borrador sin área (el LLM falló 4 veces)
+SELECT id, subject, ticket_id, delivered_at FROM inbox_messages WHERE fallback ORDER BY delivered_at DESC LIMIT 20;
 
-# Tickets que requieren revisión manual
-podman exec classifier-db psql -U admin -d classifier_db -c "
-SELECT id, subject, domain, category, suggested_category, sender, created_at
-FROM tickets
-WHERE requires_review = true
-ORDER BY created_at DESC;"
+-- Últimos errores por canal
+SELECT channel_id, at, error FROM channel_errors ORDER BY at DESC LIMIT 20;
 
-# Buscar ticket por job_id
-podman exec classifier-db psql -U admin -d classifier_db -c "
-SELECT t.id, t.subject, t.domain, t.category, t.priority,
-       r.run_id AS job_id, r.iterations_used, r.is_validated, r.duration_ms
-FROM tickets t
-JOIN agent_runs r ON r.ticket_id = t.id
-WHERE r.run_id = 'PEGA-EL-JOB-ID-AQUI';"
-
-# Performance del agente por provider
-podman exec classifier-db psql -U admin -d classifier_db -c "
-SELECT provider, AVG(duration_ms) AS avg_ms, COUNT(*) AS total
-FROM agent_runs
-WHERE is_validated = true
-GROUP BY provider;"
+-- Rendimiento del LLM
+SELECT provider, count(*), avg(duration_ms)::int AS avg_ms FROM agent_runs
+ WHERE created_at > now() - interval '7 days' GROUP BY 1;
 ```
 
-### Backup
-
-```bash
-podman exec classifier-db pg_dump -U admin classifier_db \
-  > ~/stack_ticket/ticket-classification/backup_$(date +%Y%m%d_%H%M%S).sql
-```
+Respaldo: `podman exec classifier-db pg_dump -Fc -U admin classifier_db > ~/respaldos/classifier_db_$(date +%F).dump`
+(respaldo de todo el ecosistema: infra-monitoring `03_guia_operacional.md` §11).
 
 ---
 
 ## 7. Cambiar provider de IA
 
-### Por request (sin reiniciar)
+### Qué modelo clasifica hoy
+
+En Rocky: **OCI Generative AI, modelo `openai.gpt-oss-20b`** (`AGENT_PROVIDER=oci`,
+`OCI_MODEL=openai.gpt-oss-20b`). Ollama (`llama3.2:3b`) corre pero no se usa.
 
 ```bash
-# Pasar el campo "provider" en el body
-curl -s -X POST http://localhost:8001/process \
-  -H "Content-Type: application/json" \
-  -d '{
-    "asunto": "Mi asunto",
-    "cuerpo": "Mi cuerpo",
-    "provider": "anthropic"
-  }' | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])"
-
-# Providers disponibles: ollama | openai | anthropic | gemini | oci
+curl -s http://localhost:8000/health    # "default_provider":"oci"
+curl -s http://localhost:8001/health    # "agent_provider":"oci"
+grep -E "^(AGENT_PROVIDER|OCI_MODEL)=" ~/stack_ticket/ticket-classification/.env
 ```
 
-### Por defecto permanente
+### Cambiarlo (permanente)
+
+Una sola variable: `AGENT_PROVIDER` en el `.env` (compose la pasa a `langchain-api` como
+`MODEL_PROVIDER`). Para cambiar de modelo dentro de OCI, `OCI_MODEL`.
 
 ```bash
 cd ~/stack_ticket/ticket-classification
+cp .env .env.bak-$(date +%F)
+nano .env                      # AGENT_PROVIDER=oci|ollama|openai|anthropic|gemini (y OCI_MODEL si aplica)
+bash start.sh                  # recrea langchain-api y langchain-agent con el .env nuevo
+curl -s http://localhost:8000/health   # "default_provider" = el nuevo
+curl -s http://localhost:8001/health   # "agent_provider" = el nuevo
+```
 
-# 1. Editar .env
-nano .env
-# Cambiar: AGENT_PROVIDER=openai
+`podman-compose restart` **no sirve**: un contenedor reiniciado conserva las variables con
+las que se creó (y `langchain-agent` se crea con `podman run --env-file .env` en `start.sh`).
 
-# 2. Reiniciar agente y API
-podman-compose restart langchain-agent langchain-api
+`langchain-api` guarda en caché (Redis, 1 h) las respuestas por prompt; tras cambiar de
+modelo, un correo idéntico a uno reciente puede devolver la respuesta anterior.
 
-# 3. Verificar
-curl -s http://localhost:8001/health | python3 -m json.tool
-# "agent_provider": "openai"
+### Probar un provider sin cambiar el de por defecto
+
+`/ask` acepta `"provider"` en el cuerpo y exige la llave interna (`X-Api-Key` =
+`LANGCHAIN_INTERNAL_API_KEY` del `.env`):
+
+```bash
+KEY=$(grep ^LANGCHAIN_INTERNAL_API_KEY= ~/stack_ticket/ticket-classification/.env | cut -d= -f2)
+curl -s -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" -H "X-Api-Key: $KEY" \
+  -d '{"prompt": "Responde solo: ok", "provider": "ollama"}' | python3 -m json.tool
 ```
 
 ### Verificar que una key de provider cloud funciona
 
 ```bash
-# Probar OpenAI directamente contra la API
-curl -s -X POST http://localhost:8000/ask \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "Responde solo: ok", "provider": "openai"}' \
-  | python3 -m json.tool
-
-# Probar Anthropic
-curl -s -X POST http://localhost:8000/ask \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "Responde solo: ok", "provider": "anthropic"}' \
-  | python3 -m json.tool
-
-# Probar OCI GenAI
-curl -s -X POST http://localhost:8000/ask \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "Responde solo: ok", "provider": "oci"}' \
-  | python3 -m json.tool
+# KEY como en el bloque anterior
+for P in oci openai anthropic gemini; do
+  echo "== $P"
+  curl -s -X POST http://localhost:8000/ask \
+    -H "Content-Type: application/json" -H "X-Api-Key: $KEY" \
+    -d "{\"prompt\": \"Responde solo: ok\", \"provider\": \"$P\"}" | python3 -m json.tool
+done
 ```
 
 ### Requisitos previos para OCI GenAI
@@ -368,18 +221,17 @@ sino un archivo de configuración en el host:
 # Verificar que ~/.oci/config existe y tiene el perfil [DEFAULT]
 cat ~/.oci/config
 # Debe mostrar: [DEFAULT], user, fingerprint, tenancy, region, key_file
-# key_file debe ser ~/.oci/oci_api_key.pem (no /home/<usuario>/...): se lee en host y contenedor
 
 # El archivo se monta automáticamente como volumen en langchain-api (solo lectura)
-# Configurado en docker-compose.yml: ${HOME}/.oci:/root/.oci:ro,Z
-# (Z es obligatorio con SELinux Enforcing en Rocky; ver 08_switch_to_oci_genai.md)
+# Configurado en docker-compose.yml: ${HOME}/.oci:/root/.oci:ro,z
+# (z es obligatorio con SELinux Enforcing en Rocky; ver 08_switch_to_oci_genai.md)
 ```
 
 Variables relevantes en `.env`:
 
 ```ini
 AGENT_PROVIDER=oci
-OCI_MODEL=cohere.command-r-plus-08-2024
+OCI_MODEL=openai.gpt-oss-20b
 OCI_SERVICE_ENDPOINT=https://inference.generativeai.us-chicago-1.oci.oraclecloud.com
 OCI_COMPARTMENT_ID=ocid1.compartment.oc1..tu_ocid_real
 OCI_TEMPERATURE=0
@@ -388,399 +240,140 @@ OCI_MAX_TOKENS=1400
 
 ---
 
-## 8. Agregar o modificar dominios y categorías
+## 8. Áreas y categorías
 
-```bash
-cd ~/stack_ticket/ticket-classification
+Cada cliente tiene su propio catálogo y lo administra **su admin en el portal** (⚙️
+Administración → Gestionar áreas y categorías). El clasificador lo recibe de
+ticket-management en cada resolución del canal (caché ≤ 60 s): un cambio en el portal se usa
+en los siguientes correos sin tocar este repo. Si el clasificador se reinició y el canal no ha
+mandado correos desde entonces, usa el catálogo guardado con el mensaje al recibirlo.
 
-# 1. Editar .env
-nano .env
-# Ejemplo — agregar dominio RRHH:
-# AGENT_DOMAINS=IT,cliente,operaciones,RRHH,otro
-# CATEGORIES_RRHH=vacaciones,permisos,nomina,capacitacion,onboarding
+`AGENT_DOMAINS` y `CATEGORIES_*` del `.env` **solo** se usan en modo mock (§9).
 
-# 2. Reiniciar solo el agente
-podman-compose restart langchain-agent
-
-# 3. Verificar dominios activos
-curl -s http://localhost:8001/health | python3 -m json.tool
-# "agent_domains": ["IT", "cliente", "operaciones", "RRHH", "otro"]
-```
-
-**Fuzzy matching:** si el LLM devuelve `"categoría": "vacacion"` (sin 's')
-y el umbral `FUZZY_THRESHOLD=80` lo acepta, guarda `"vacaciones"` como
-categoría canónica y `"vacacion"` como `suggested_category`.
+**Fuzzy matching:** si el LLM devuelve una categoría parecida (`FUZZY_THRESHOLD=80`) se guarda
+la canónica y la propuesta queda en `categoriaPropuesta`.
 
 ---
 
-## 9. Modo mock — desarrollo sin LLM
+## 9. Modo mock — pruebas sin LLM
 
-Útil para probar el flujo completo sin consumir tokens ni esperar al LLM.
+Clasifica sin llamar al LLM, con valores fijos (útil en desarrollo; **no** en Rocky):
 
 ```bash
-# 1. Activar en .env
-nano ~/stack_ticket/ticket-classification/.env
-# AGENT_MOCK_CLASSIFY=true
-# MOCK_DOMINIO=IT
-# MOCK_CATEGORIA=acceso
-# MOCK_PRIORIDAD=BAJA
-# MOCK_CONFIANZA=1.0
-
-# 2. Reiniciar agente
-cd ~/stack_ticket/ticket-classification
-podman-compose restart langchain-agent
-
-# 3. Probar — responde en <1s sin llamar al LLM
-JOB=$(curl -s -X POST http://localhost:8001/process \
-  -H "Content-Type: application/json" \
-  -d '{"asunto":"Test mock","cuerpo":"Prueba rápida sin LLM"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])")
-sleep 2
-curl -s http://localhost:8001/status/$JOB | python3 -m json.tool
+# .env
+AGENT_MOCK_CLASSIFY=true
+MOCK_DOMINIO=IT
+MOCK_CATEGORIA=acceso
+MOCK_PRIORIDAD=BAJA
+MOCK_CONFIANZA=1.0
+# el catálogo sale de AGENT_DOMAINS y CATEGORIES_*
+bash start.sh
 ```
 
 ---
 
-## 10. Ciclo de desarrollo — cambios en código
-
-### Cambios en langchain-agent
+## 10. Desplegar cambios de código
 
 ```bash
 cd ~/stack_ticket/ticket-classification
-
-# Editar código (hot reload activo — el volumen monta ./langchain-agent:/app)
-# Solo reiniciar el contenedor si cambió requirements.txt o el Dockerfile
-
-# Si cambió solo código Python → reiniciar el proceso:
-podman-compose restart langchain-agent
-
-# Si cambió requirements.txt → reconstruir imagen:
-podman-compose build langchain-agent
-podman-compose up -d langchain-agent
-podman logs -f langchain-agent
-# Buscar: "Uvicorn running on http://0.0.0.0:8001"
+git pull                                   # Rocky sigue origin/develop
+podman-compose build langchain-agent       # y/o langchain-api
+bash start.sh                              # recrea todo; aplica el parche de langchain-agent
+curl -s http://localhost:8001/health
 ```
 
-### Cambios en langchain-api
-
-```bash
-cd ~/stack_ticket/ticket-classification
-podman-compose build langchain-api
-podman-compose up -d langchain-api
-podman logs -f langchain-api
-```
-
-### Reconstrucción completa
-
-```bash
-cd ~/stack_ticket/ticket-classification
-podman-compose down
-podman-compose build --no-cache
-podman-compose up -d
-```
+Si hay migraciones nuevas, respaldar `classifier_db` antes (§6) y revisar
+`podman logs classifier-flyway`.
 
 ---
 
-## 11. Gestión de Ollama
+## 11. Ollama
+
+En Rocky no se usa (provider `oci`), pero el contenedor corre.
 
 ```bash
-# Ver modelos instalados
 podman exec ollama ollama list
-
-# Descargar modelo (primera vez o actualizar)
 podman exec -it ollama ollama pull llama3.2:3b
-
-# Modelo más capaz (más lento, requiere más RAM)
-podman exec -it ollama ollama pull llama3.1:8b
-
-# Probar modelo directamente
 podman exec -it ollama ollama run llama3.2:3b "Clasifica: servidor caído en producción"
-# Ctrl+D para salir
-
-# Eliminar modelo (liberar espacio en disco)
-podman exec ollama ollama rm llama3.1:8b
-
-# Ver RAM durante inferencia
 podman stats ollama --no-stream
 ```
 
 ---
 
-## 12. Redis — caché y estado de jobs
+## 12. Redis — cola de trabajo y caché
+
+`classifier-redis` guarda la cola `inbox-work` (grupo `classifier-workers`) y la caché de
+respuestas del LLM (1 h). **No** es la fuente de verdad: si se pierde, el barrido de cada minuto
+reconstruye el trabajo desde `inbox_messages`.
 
 ```bash
-# Verificar que Redis responde
-podman exec classifier-redis redis-cli ping
-# PONG
-
-# Número de keys en cache
-podman exec classifier-redis redis-cli dbsize
-
-# Ver todos los jobs activos
-podman exec classifier-redis redis-cli keys "job:*"
-
-# Ver estado de un job específico
-podman exec classifier-redis redis-cli get "job:PEGA-EL-JOB-ID-AQUI"
-
-# Limpiar caché LLM (fuerza re-clasificación en siguientes requests)
-# ⚠️ También elimina el estado de jobs en proceso
-podman exec classifier-redis redis-cli flushdb
-
-# TTL restante de un job (en segundos — máximo 86400 = 24h)
-podman exec classifier-redis redis-cli ttl "job:PEGA-EL-JOB-ID-AQUI"
+R='redis-cli --no-auth-warning -a "$REDIS_PASSWORD"'
+podman exec classifier-redis sh -c "$R ping"
+podman exec classifier-redis sh -c "$R XINFO GROUPS inbox-work"     # pendientes y lag
+podman exec classifier-redis sh -c "$R dbsize"
 ```
+
+Vaciar Redis (`FLUSHALL`) no pierde correos, pero borra la caché del LLM.
 
 ---
 
-## 13. MinIO — adjuntos de correos
+## 13. MinIO — archivos de los correos
+
+Bucket privado `classifier-inbox`, ruta `t<tenant>/<canal>/<mensaje>/<uuid>`. Los archivos de un
+correo se borran a los `CLASSIFIER_RETENTION_DAYS` (30) días de entregado; los de un retenido,
+al descartarlo.
 
 ```bash
-# Verificar salud
 curl -sf http://localhost:9000/minio/health/live && echo "MinIO OK"
-
-# Consola web (navegador Windows)
-# http://localhost:9001  →  minioadmin / minioadmin123
-
-# Listar archivos del bucket desde WSL
-podman exec minio mc alias set local http://localhost:9000 minioadmin minioadmin123
-podman exec minio mc ls local/email-attachments/
-
-# Ver adjuntos de un ticket específico
-podman exec classifier-db psql -U admin -d classifier_db -c "
-SELECT a.filename, a.content_type, a.storage_key, a.created_at
-FROM attachments a
-WHERE a.ticket_id = TU_TICKET_ID
-ORDER BY a.created_at;"
+# Archivos de un correo (desde la base; la imagen de MinIO no trae el cliente mc)
+podman exec classifier-db psql -U admin -d classifier_db -c \
+  "SELECT filename, content_type, size, inline, storage_key FROM inbox_attachments WHERE message_id = '<id>';"
 ```
+
+Consola web: `http://localhost:9001` (por túnel), usuario y contraseña del `.env`.
 
 ---
 
 ## 14. Migraciones Flyway
 
 ```bash
-# Ver logs de la última migración
-podman logs classifier-flyway
-# Resultado esperado:
-# Successfully applied N migration(s) to schema "public"
-
-# Forzar re-ejecución de migraciones (si classifier-db fue recreado)
-podman-compose up classifier-flyway
-
-# Ver estado de migraciones directamente en la BD
-podman exec classifier-db psql -U admin -d classifier_db -c "
-SELECT version, description, installed_on, success
-FROM flyway_schema_history
-ORDER BY installed_rank;"
+podman logs classifier-flyway        # "Successfully applied N migration(s)" o "Schema ... is up to date"
+podman-compose up classifier-flyway  # re-ejecutar
+podman exec classifier-db psql -U admin -d classifier_db -c \
+  "SELECT version, description, installed_on, success FROM flyway_schema_history ORDER BY installed_rank;"
 ```
+
+Migraciones vigentes: V1, V2 y V3 (`V3__inbox_schema.sql`, la bandeja).
 
 ---
 
 ## 15. LangSmith — trazas del agente
 
 ```bash
-# Activar trazas en .env
+# .env
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_API_KEY=tu-key-de-langsmith
 LANGCHAIN_PROJECT=ticket-classification-dev
-
-# Reiniciar agente y API para que tomen la configuración
-cd ~/stack_ticket/ticket-classification
-podman-compose restart langchain-agent langchain-api
+bash start.sh
 ```
 
-En https://smith.langchain.com → proyecto `ticket-classification-dev`:
-
-| Dato | Qué indica |
-|---|---|
-| Total duration | Tiempo total de clasificación |
-| Nodo classify → latencia | Tiempo de respuesta del LLM |
-| Nodo validate → error | Problemas de formato JSON o schema |
-| iterations_used | Cuántos intentos necesitó el agente |
-| confidence | Certeza del LLM en su respuesta |
+En https://smith.langchain.com → proyecto: duración, latencia del LLM, errores de validación,
+iteraciones y confianza de cada clasificación.
 
 ---
 
-## 16. Git — control de versiones
+## 16. Checklist diario
 
 ```bash
 cd ~/stack_ticket/ticket-classification
-
-git status
-git diff
-
-# Convención de commits (Conventional Commits en español imperativo)
-git add langchain-agent/agent.py
-git commit -m "fix(agent): corregir validación de confianza mínima"
-
-git push origin develop   # Rama de trabajo — nunca pushear directo a main
-```
-
-**Ramas (Git Flow):**
-
-| Prefijo | Uso |
-|---|---|
-| `feature/` | Nueva funcionalidad |
-| `bugfix/` | Corrección de bug |
-| `hotfix/` | Fix urgente en producción |
-| `chore/` | Configuración, dependencias |
-| `docs/` | Solo documentación |
-
----
-
-## 17. Troubleshooting
-
-### El agente devuelve 502 en `/ask`
-
-```bash
-# Ver logs de langchain-api con el error real
-podman logs --tail 50 langchain-api 2>&1 | grep -i "error\|provider"
-# El error se loguea con traceback completo gracias al logger configurado
-
-# Causas comunes:
-# 1. API key del provider inválida o expirada → verificar .env
-podman exec langchain-api env | grep -E "MODEL_PROVIDER|OPENAI|ANTHROPIC|GEMINI|OLLAMA"
-
-# 2. Ollama sin modelo descargado
-podman exec ollama ollama list
-
-# 3. Ollama sin recursos suficientes
-free -h   # Verificar RAM disponible (>4GB recomendado)
-```
-
-### Job queda en `en_proceso` indefinidamente
-
-```bash
-# Ver logs del agente en el momento del error
-podman logs --tail 100 langchain-agent 2>&1 | grep -i "error\|job"
-
-# Verificar Redis
-podman exec classifier-redis redis-cli get "job:TU-JOB-ID"
-
-# Causas comunes:
-# 1. classifier-db no disponible
-podman ps | grep classifier-db
-
-# 2. ticket-system-backend no alcanzable (en nodo save)
-podman exec langchain-agent sh -c 'python3 -c "import urllib.request; urllib.request.urlopen(\"http://ticket-system-backend:8080/actuator/health\")"' 2>&1
-```
-
-### classifier-db no acepta conexiones
-
-```bash
-podman logs --tail 20 classifier-db
-podman-compose restart classifier-db
-sleep 15
-podman exec classifier-db psql -U admin -d classifier_db -c "SELECT version();"
-```
-
-### Flyway falla al migrar
-
-```bash
-podman logs classifier-flyway
-# Si el error es "duplicate key" → la migración ya fue aplicada parcialmente
-# Si el error es "connection refused" → classifier-db no terminó de iniciar
-
-# Re-ejecutar Flyway
-podman-compose up classifier-flyway
-```
-
-### "network not found" al hacer podman-compose up
-
-```bash
-# Crear las redes manualmente
-podman network create --subnet 10.89.1.0/24 ticket-management-network
-podman network create --subnet 10.89.2.0/24 ticket-classification-network
-# Luego reintentar
-podman-compose up -d
-```
-
----
-
-## 18. Checklist de verificación diaria
-
-```bash
-cd ~/stack_ticket/ticket-classification
-
-# ✅ 1. Contenedores corriendo
-podman ps --format "table {{.Names}}\t{{.Status}}"
-# classifier-flyway puede estar Exited 0 — es normal (one-shot)
-
-# ✅ 2. Agente responde
-curl -s http://localhost:8001/health | grep -q "ok" && echo "Agente: OK" || echo "Agente: ❌"
-
-# ✅ 3. API responde y provider configurado
+podman ps --format "table {{.Names}}\t{{.Status}}"          # classifier-flyway "Exited (0)" es normal
+curl -s http://localhost:8001/health | grep -q '"ticket_management":"ok"' && echo "Agente OK" || echo "Agente ❌"
 curl -s http://localhost:8000/health | python3 -m json.tool
-
-# ✅ 4. Clasificación funciona end-to-end
-JOB=$(curl -s -X POST http://localhost:8001/process \
-  -H "Content-Type: application/json" \
-  -d '{"asunto":"Test diario","cuerpo":"Verificación de salud del clasificador","conversation_id":"DAILY-CHECK"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])")
-sleep 30
-curl -s http://localhost:8001/status/$JOB \
-  | python3 -c "import sys,json; d=json.load(sys.stdin); print('Clasificador:', d.get('status'), '| dominio:', d.get('domain','?'))"
-
-# ✅ 5. PostgreSQL accesible
-podman exec classifier-db psql -U admin -d classifier_db -c "SELECT COUNT(*) FROM tickets;" -t \
-  && echo "PostgreSQL: OK" || echo "PostgreSQL: ❌"
-
-# ✅ 6. Redis activo
-podman exec classifier-redis redis-cli ping | grep -q "PONG" && echo "Redis: OK" || echo "Redis: ❌"
-
-# ✅ 7. MinIO accesible
-curl -sf http://localhost:9000/minio/health/live && echo "MinIO: OK" || echo "MinIO: ❌"
-
-# ✅ 8. Disco disponible
-df -h ~/stack_ticket/ticket-classification
-
-# ✅ 9. RAM disponible (>4GB recomendado si usas Ollama)
-free -h | grep Mem
+podman exec classifier-db psql -U admin -d classifier_db -At -c \
+  "SELECT state, count(*) FROM inbox_messages WHERE state <> 'DELIVERED' GROUP BY 1;"   # vacío = nada pendiente
+df -h ~ ; free -h | grep Mem
 ```
 
 ---
 
-## Referencia rápida de comandos
-
-```bash
-# ── Stack ──────────────────────────────────────────────────────────
-bash ~/stack_ticket/ticket-classification/start.sh      # Levantar
-cd ~/stack_ticket/ticket-classification && podman-compose down   # Apagar
-podman-compose restart langchain-agent                  # Reiniciar servicio
-podman ps                                               # Estado
-podman stats --no-stream                                # CPU y RAM
-
-# ── Logs ───────────────────────────────────────────────────────────
-podman logs --tail 50 langchain-agent
-podman logs --tail 50 langchain-api
-podman logs classifier-flyway
-
-# ── Clasificador (flujo asíncrono) ─────────────────────────────────
-# Paso 1: enviar
-JOB=$(curl -s -X POST http://localhost:8001/process \
-  -H "Content-Type: application/json" \
-  -d '{"asunto":"ASUNTO","cuerpo":"CUERPO","remitente":"user@empresa.com"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])")
-# Paso 2: consultar
-curl -s http://localhost:8001/status/$JOB | python3 -m json.tool
-
-# ── Base de datos ──────────────────────────────────────────────────
-podman exec -it classifier-db psql -U admin -d classifier_db
-podman exec classifier-db psql -U admin -d classifier_db \
-  -c "SELECT id, subject, domain, category, priority FROM tickets ORDER BY id DESC LIMIT 5;"
-
-# ── Redis ──────────────────────────────────────────────────────────
-podman exec classifier-redis redis-cli ping
-podman exec classifier-redis redis-cli dbsize
-podman exec classifier-redis redis-cli keys "job:*"
-
-# ── Ollama ─────────────────────────────────────────────────────────
-podman exec ollama ollama list
-podman exec -it ollama ollama pull llama3.2:3b
-
-# ── Desarrollo ─────────────────────────────────────────────────────
-podman-compose build langchain-agent && podman-compose up -d langchain-agent
-```
-
----
-
-*ticket-classification · Guía Operacional · Mayo 2026*
+*ticket-classification · Guía Operacional · Octubre 2026*
