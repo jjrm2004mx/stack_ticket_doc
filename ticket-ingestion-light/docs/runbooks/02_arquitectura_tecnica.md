@@ -122,13 +122,41 @@ compartido y posteaban a `/process`, que ya no existe. No activarlos.
   "bodyText": "...",
   "bodyHtml": "...",
   "receivedAt": "<receivedDateTime>",
+  "importance": "low | normal | high",
+  "cc": ["..."],
+  "sender": {"address": "...", "name": "..."},
+  "replyTo": ["..."],
+  "sentAt": "<sentDateTime>",
+  "conversationIndex": "<conversationIndex>",
+  "messageType": "message | eventMessageRequest | …",
+  "inferenceClassification": "focused | other",
+  "categories": ["..."],
+  "flagStatus": "notFlagged | flagged | complete",
+  "uniqueBodyHtml": "...", "uniqueBodyText": "...",
+  "headers": {"in-reply-to": "<…>", "references": "<…> <…>", "auto-submitted": "...", "…": "…"},
   "attachments": [{"name": "...", "contentType": "...", "size": 0,
                    "contentBase64": "...", "inline": false, "contentId": null}]
 }
 ```
 
-Cabecera `X-Channel-Key: <llave del canal>`. El clasificador decide si es ticket nuevo,
-respuesta o duplicado (ver ticket-classification, `09_bandeja_mensajes_retenidos.md`).
+Cabecera `X-Channel-Key: <llave del canal>`. La ingesta **transporta, no decide**: nunca descarta ni
+reescribe un correo por su contenido (decisión del 2026-10-29). El clasificador decide si es ticket,
+respuesta o duplicado (ver ticket-classification, `02_arquitectura_tecnica.md` §3 y
+`09_bandeja_mensajes_retenidos.md`).
+
+De estos campos dependen funciones de la plataforma; **quitarlos de una copia del workflow las apaga
+para ese buzón**:
+
+| Campo | Lo usa |
+|---|---|
+| `cc`, `to`, `sender` | Destinatarios y "a quién" del hilo del correo; ¿es ticket? (¿va dirigido al buzón?, ¿lo mandó el equipo?) |
+| `uniqueBodyText/Html` | Texto propio sin la cita (hilo del correo, ¿es ticket?) |
+| `headers.in-reply-to`, `headers.references` | Ligar una respuesta a su ticket aunque Outlook le haya cambiado la conversación |
+| `headers.auto-submitted`, `precedence`, `list-*`, `x-canal-aviso`, `messageType` | Reglas fijas de ¿es ticket? (automáticos, masivos, invitaciones, avisos propios) |
+| `importance` | Prioridad del ticket |
+| `threadKey`, `internetMessageId` | Ligar respuestas por conversación y por encabezados |
+
+La lista completa y exacta está en la spec `channel-mailbox-workflows` (requisito "Full message transport").
 
 ### Webhooks de envío
 

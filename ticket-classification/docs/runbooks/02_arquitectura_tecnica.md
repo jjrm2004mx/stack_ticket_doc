@@ -91,9 +91,15 @@ POST /inbox/email ─▶ RECEIVED ─▶ CLASSIFYING ─▶ READY ─▶ DELIVER
 | Guardado en MinIO y PostgreSQL | `202 RECEIVED` (y se encola en `inbox-work`) |
 | Falla el almacenamiento | `500` (no queda nada parcial; n8n reintenta) |
 
-**Nuevo o respuesta (`kind`)**: `REPLY` si la conversación (`thread_key`) ya tiene un ticket
-entregado, o si el asunto trae `#<8 hex>` de exactamente un ticket del canal; si el primer
-correo de la conversación aún no se entrega, la respuesta espera. Si no, `NEW`.
+**Nuevo o respuesta (`kind`)**, en este orden:
+1. `REPLY` si la conversación (`thread_key`) ya tiene un ticket entregado; si el primer correo de la
+   conversación aún no se entrega, la respuesta espera.
+2. `REPLY` si el asunto trae `#<8 hex>` de exactamente un ticket del canal.
+3. `REPLY` si `In-Reply-To` o `References` citan un correo del canal que ya es parte de un ticket
+   (Outlook cambia la conversación cuando editan el asunto), **solo** si ese ticket sigue abierto
+   (`GET /internal/channel-tickets/{id}/state` de ticket-management) y el correo citado tiene 30 días
+   o menos (`HEADER_LINK_MAX_DAYS`); ante la duda, `NEW`.
+4. Si no, `NEW`.
 
 **Imágenes en línea**: < 10 240 bytes, o repetidas del mismo remitente (3.ª vez en 90 días) =
 firma, no se guardan; las demás se guardan con su `contentId`.
@@ -101,10 +107,23 @@ firma, no se guardan; las demás se guardan con su `contentId`.
 **Clasificación** (`NEW`): grafo LangGraph con el catálogo actual del cliente (área =
 Clasificación del tenant, categorías). Un intento falla si el LLM falla o no responde
 parseable; reintentos a 1, 5 y 15 min (4 intentos) y luego `READY` con `fallback=true` (sin
-área, `requiereValidacion=true`). Para `REPLY`: evaluación `{relevante, razon, resumen}`.
+área, `requiereValidacion=true`). Para `REPLY`: evaluación `{relevante, razon, resumen, intencion}` en
+una sola llamada; `intencion` = `pide_informacion`, `entrega_informacion`, `confirma_solucion`,
+`nueva_solicitud` o `comentario` (lo demás, null) y `resumen` viaja aunque no sea relevante. Con eso
+ticket-management sugiere o hace el movimiento del ticket (gestión por correo).
+
+**¿Es ticket?** (`NEW`, `TRIAGE_ENABLED`): antes de entregar se decide el tipo (`solicitud`,
+`seguimiento`, `paso`, `para_conocimiento`, `no_requiere_accion`, `dudoso`) con reglas fijas (avisos
+propios, invitaciones, recall, automáticos, masivos) y luego el LLM con el contexto del cliente; viaja
+en `data.triage = {tipo, accion, motivo, confianza, regla, dueno}` (`dueno` solo en un seguimiento del
+equipo: quien lo mandó). Un reintento de entrega reusa la decisión guardada; si falla, `triage` es null
+y el ticket se crea como siempre. Si se aplica (archivar, Borradores, asignar al dueño) lo decide el
+interruptor del cliente en ticket-management.
 
 **Entrega** a ticket-management: `NEW` → `POST /internal/channel-tickets`; `REPLY` →
-`POST /internal/channel-tickets/{ticketId}/replies` (multipart: parte `data` JSON + `files`).
+`POST /internal/channel-tickets/{ticketId}/replies` (multipart: parte `data` JSON + `files`). Con cada
+correo viajan los destinatarios (`to`, `cc`), el texto propio sin la cita (`ownText`) y, en las
+respuestas, `receivedAt` e `intencion`: alimentan el hilo del correo del detalle.
 
 | Respuesta | Resultado |
 |---|---|
@@ -132,7 +151,7 @@ operador lo resuelve.
 
 | Tabla (`classifier_db`) | Contenido |
 |---|---|
-| `inbox_messages` | Un correo por fila: canal, tenant, `kind`, `state`, `classification`, `reply_evaluation`, `fallback`, `ticket_id`, intentos, `last_error`, `held_reason`, fechas. Único `(channel_id, external_id)` |
+| `inbox_messages` | Un correo por fila: canal, tenant, `kind`, `state`, `classification`, `reply_evaluation` (con `intencion`), `triage` (decisión ¿es ticket?), `envelope` (cc, encabezados, `conversationIndex`…), texto propio (`unique_body_*`), `fallback`, `ticket_id`, intentos, `last_error`, `held_reason`, fechas. Único `(channel_id, external_id)` |
 | `inbox_attachments` | Archivos guardados: nombre, tipo, tamaño, `sha256`, `inline`, `content_id`, `storage_key` |
 | `agent_runs` | Un registro por intento de clasificación/evaluación (`result` JSONB, `duration_ms`, `provider`) |
 | `channel_errors` | Errores por canal (buzón, clasificación, entrega) |
@@ -157,6 +176,7 @@ Base `TICKET_MGMT_API_URL` (`http://ticket-system-backend:8080/api/v1`), cabecer
 | `POST /internal/channels/{id}/status` | Reporte de salud del canal |
 | `POST /internal/channel-tickets` | Crear ticket (idempotente) |
 | `POST /internal/channel-tickets/{ticketId}/replies` | Agregar respuesta |
+| `GET /internal/channel-tickets/{ticketId}/state?channelId=` | ¿El ticket sigue abierto? (antes de ligar por encabezados) |
 
 Si `CLASSIFIER_SERVICE_KEY` no coincide con ticket-management: todo da `401`, `/inbox/email`
 responde `503` y las entregas esperan en `READY` (nada se pierde).

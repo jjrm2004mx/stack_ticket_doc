@@ -22,7 +22,7 @@ Las acciones están agrupadas por la parte del portal que controlan. Cada grupo 
 | Ver tickets (VIEW_TICKETS) | Abrir el tablero, la lista y el detalle de los tickets que le corresponden | ✅ Fijo | ✅ Fijo | ✅ Fijo |
 | Ver tickets sin asignar (VIEW_UNASSIGNED_TICKETS) | Ver también los tickets que aún no tienen responsable | ❌ | ✅ | ✅ Fijo |
 | Ver todos los tickets (VIEW_ALL_TICKETS) | Ver todos los tickets de la organización, no solo los asignados al usuario | ❌ | ✅ | ✅ Fijo |
-| Crear tickets (CREATE_TICKET) | Botón «+ Nuevo ticket» | ✅ | ✅ | ✅ Fijo |
+| Crear tickets (CREATE_TICKET) | Botón «Nuevo ticket» | ✅ | ✅ | ✅ Fijo |
 
 ### 🧾 Trabajo en el ticket — acciones dentro del detalle de un ticket
 
@@ -133,7 +133,7 @@ No. La fila "Gestionar permisos" muestra que solo Admin puede editar esta matriz
 Sí. Si lo desactivas, los Managers no podrán ejecutar ninguna transición de estado.
 
 **¿Qué pasa si desactivo "Crear tickets" para el rol Usuario?**
-Los usuarios no verán "+ Nuevo ticket". Seguirán pudiendo ver y comentar los tickets que les corresponden.
+Los usuarios no verán "Nuevo ticket". Seguirán pudiendo ver y comentar los tickets que les corresponden.
 
 **¿Los permisos aplican al usuario específico o al rol?**
 Al **rol**. Todos los usuarios del mismo rol tienen exactamente los mismos permisos. Para dar capacidades especiales a una persona, cambia su rol.

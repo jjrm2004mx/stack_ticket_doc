@@ -74,7 +74,7 @@ Como Manager tienes control total sobre los adjuntos de un ticket.
 
 ### Ver y descargar adjuntos
 1. Abre el detalle del ticket
-2. Usa **"Adjuntos"** en el encabezado del detalle (o "Ver todos" de su sección de adjuntos)
+2. Usa **"Adjuntos"** en la barra de acciones del detalle (o "Ver todos" de su sección de adjuntos)
 3. Verás la lista de archivos con nombre, tamaño y quién los subió
 4. Haz clic en un archivo para descargarlo o visualizarlo
 
@@ -125,7 +125,7 @@ El historial muestra un registro completo y auditable de todo lo que ocurrió co
 
 **Cómo acceder:**
 1. Abre el detalle del ticket
-2. Ve a la pestaña **"Eventos"** o **"Historial"**
+2. Haz clic en **"Historial"** en la barra de acciones (arriba de la columna izquierda)
 
 **Campos que muestra cada evento:**
 - Tipo de evento
@@ -140,23 +140,30 @@ El historial muestra un registro completo y auditable de todo lo que ocurrió co
 Los borradores son tickets que llegaron al sistema (normalmente desde correo electrónico) y necesitan revisión antes de activarse.
 
 **Cómo acceder a los borradores:**
-1. En el menú principal ve a **"Revisión de Borradores"**
-2. Verás la lista de todos los tickets pendientes de revisión
+1. En el menú de la izquierda haz clic en **"Borradores"** (su contador dice cuántos hay; solo aparece si tu rol tiene "Revisar borradores")
+2. Se abre la **Bandeja de revisión**. Junto al título dice **"Se aprueban como ● <estado inicial>"**: el estado en que entrarán al aprobarlos
 
-**Qué puedes hacer con un borrador:**
-- Ver el contenido original (incluyendo el email HTML si llegó por correo)
-- Editar: prioridad, área, categoría y asignado a
-- **Aprobar** el borrador → entra al estado inicial de la organización y al flujo normal
+**Qué ves en cada borrador:**
+- El chip **BORRADOR**, el solicitante y su correo, el título, la descripción y la fecha de creación
+- Arriba a la derecha, **"Correo original"** (si llegó por correo: abre el mensaje tal como llegó) y **"Adjuntos"** con su número (si trae archivos). Los adjuntos son **solo de consulta**: aquí no se suben ni se eliminan
+- Un aviso en rojo si el clasificador pidió un área o una categoría que no existe o está inactiva
+
+**Qué decides**, con los mismos campos y en el mismo orden que **"Nuevo ticket"**:
+- **Prioridad**: en la lista, con su punto de color
+- **Área · Categoría**: un solo selector; si falta lo que pidió el clasificador, se marca en rojo con "Solicitada: …" debajo
+- **Asignar a** (si tu rol puede asignar): si el área o la categoría tienen regla de asignación, viene propuesta la persona que le toca (en verde); si eliges a otra, **"Usar la sugerencia"** vuelve a ella
 
 **Cuándo existe un borrador:** cuando el sistema de ingesta automática (ticket-ingestion-light/n8n) procesa un correo entrante y lo crea como borrador para revisión humana.
 
 **Pasos para aprobar:**
-1. Abre el borrador
-2. Revisa y ajusta área, categoría, prioridad y asignación
+1. Revisa el correo original y los adjuntos si hace falta
+2. Ajusta prioridad, área y categoría y, si aplica, la asignación
 3. Haz clic en **"Aprobar"**
-4. El ticket pasa al estado inicial y es visible en el flujo normal
+4. El ticket pasa al estado inicial y aparece en el tablero y la lista (al refrescar)
 
-**Nota:** no puedes eliminar borradores — esa acción es exclusiva de Admin.
+**Nota:** los borradores solo se aprueban; no se pueden rechazar ni eliminar desde el portal (tampoco el Admin).
+
+**Si el borrador es basura** (spam, publicidad, un duplicado o algo que no debe entrar al flujo): no lo apruebes tú. Avisa a un **Admin**: él lo aprueba y enseguida lo archiva desde su detalle, así no queda en el tablero ni en la lista. Como Manager no tienes el permiso para archivar tickets, así que si lo apruebas quedaría activo hasta que un Admin lo archive. Mientras tanto, el borrador se queda en la bandeja sin afectar nada.
 
 ---
 
@@ -217,3 +224,15 @@ Para cambiarla: clic en tu nombre o tus iniciales, arriba a la derecha → **"Ca
 
 **¿Cuándo debo usar "EN REVISIÓN" vs cerrar directamente?**
 Usa EN REVISIÓN cuando quieras que alguien (el solicitante u otro Manager) confirme que el problema fue resuelto antes del cierre formal. Si estás seguro de que está resuelto, puedes cerrar directamente desde EN REVISIÓN.
+
+---
+
+## 8. Revisar los archivados
+
+En el menú de la izquierda, **"Archivados"** (solo aparece si tu rol tiene "Revisar borradores") lista los tickets archivados con el motivo por el que se archivaron, por ejemplo un aviso automático de la mesa de soporte o una copia de un correo del propio equipo. Filtra por motivo con los contadores de arriba, busca por título, solicitante o detalle, y usa **"Abrir"** para ver el detalle. Restaurar un ticket es solo del Admin: si uno no debió archivarse, avísale.
+
+---
+
+## 9. Palabras clave (si el Admin te dio el permiso)
+
+Si tu Admin te dio **"Gestionar palabras clave"** y la plataforma las encendió para tu organización, en el menú aparece **"Áreas y categorías"** y ahí solo verás la pestaña **"Palabras clave"**. Despliega un área con ▶; en cada categoría escribe una frase de 1 a 4 palabras en "Nueva frase..." y presiona Enter. Las frases ayudan a la IA a reconocer la categoría de un correo (el asunto pesa más que el cuerpo), pero decide la IA. Cada frase pertenece a una sola categoría; corrige con el lápiz del chip y quita con la ✕.

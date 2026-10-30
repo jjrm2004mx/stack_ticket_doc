@@ -204,16 +204,15 @@ Backend arranca
 
 ## Workflows y transiciones de estado
 
-El sistema tiene un motor de workflows configurable que define qué
-transiciones de estado son válidas para cada ticket.
+Cada cliente configura sus estados en **Gestión de Workflow**: el nombre lo elige el cliente y la
+**categoría** la entiende el sistema (Nuevo, En curso, En espera —pausa la fecha límite—, Cerrado ·
+Resuelto o Cancelado). Las **transiciones** dicen a qué estado puede pasar un ticket desde cada uno.
+Un cliente nuevo nace con Abierto → En progreso → En revisión → Cerrado.
 
-| Estado | Transiciones posibles |
-|---|---|
-| `ABIERTO` | → `EN_PROCESO`, → `CERRADO` |
-| `EN_PROCESO` | → `RESUELTO`, → `EN_ESPERA` |
-| `EN_ESPERA` | → `EN_PROCESO`, → `CERRADO` |
-| `RESUELTO` | → `CERRADO`, → `REABIERTO` |
-| `CERRADO` | — (estado final) |
+Con buzón de correo, los tickets además se mueven **según las respuestas del correo** (gestión por
+correo): cada estado puede tener un rol —El equipo atiende, En espera del solicitante, En espera de un
+tercero, Resuelto (falta confirmación), Cerrado al confirmar— y la IA sugiere o hace el movimiento.
+Ver [14_gestion_por_correo.md](14_gestion_por_correo.md).
 
 ---
 

@@ -27,8 +27,7 @@ Como Admin heredas todas las capacidades de Manager más las exclusivas de Admin
 - Eliminar adjuntos
 - Ver historial completo de eventos
 - Ver dashboard de métricas
-- Revisar y aprobar borradores
-- **Eliminar borradores** (exclusivo Admin)
+- Revisar y aprobar borradores (no se pueden rechazar ni eliminar)
 - **Archivar tickets** (exclusivo Admin)
 
 **Para los flujos de gestión de tickets (crear, editar, cambiar estado, adjuntos, comentarios, borradores):** consulta el documento `manager/flujos.md` — los pasos son idénticos para Admin.
@@ -135,9 +134,27 @@ Define quién recibe los tickets que entran por correo, según su área y catego
 - Un área con **"Nadie"** (⚠) deja sus tickets sin asignar, para que el administrador los asocie.
 - Una persona inactiva aparece tachada y se salta; si una categoría se queda sin nadie activo, se usa la regla de su área.
 - **"Ver por persona"** muestra en qué filas recibe tickets alguien (útil antes de desactivarlo).
-- Solo se asignan solos los correos que entran **activos**. Los borradores no se asignan solos: al aprobarlos en la Bandeja de revisión, "Asignar a" viene propuesto con la persona de la regla. En **"+ Nuevo ticket"** también se propone al elegir "Área · Categoría"; en ambos casos puedes cambiarla ("Usar la sugerencia" la vuelve a poner).
+- Solo se asignan solos los correos que entran **activos**. Los borradores no se asignan solos: al aprobarlos en la Bandeja de revisión, "Asignar a" viene propuesto con la persona de la regla. En **"Nuevo ticket"** también se propone al elegir "Área · Categoría"; en ambos casos puedes cambiarla ("Usar la sugerencia" la vuelve a poner).
 - Reclasificar un ticket activo no cambia su asignado.
 - En el historial del ticket, una asignación hecha por la regla aparece como **"⚙ Asignado automáticamente"**. Si "Asignación" está encendida en Notificaciones, el solicitante recibe el aviso con el nombre de la persona asignada.
+
+### Palabras clave (pestaña "Palabras clave")
+
+Frases que ayudan a la IA a reconocer a qué categoría pertenece un correo. La pestaña solo aparece si la plataforma encendió las palabras clave para tu organización; apagadas, todo funciona como siempre y las frases se conservan.
+
+**Cómo acceder:** "Áreas y categorías" → pestaña **"Palabras clave"**. Despliega un área con ▶: cada categoría activa muestra sus frases como chips.
+
+**Cómo funcionan:**
+- El clasificador busca las frases en el asunto y en el cuerpo de cada correo y le dice a la IA a qué área y categoría apuntan. El asunto pesa más que el cuerpo.
+- Deciden la IA y el contenido del correo: si el correo no pide lo que sugiere la frase, se ignora. Un correo dudoso sigue llegando como borrador.
+- Una frase tiene de 1 a 4 palabras. No importan mayúsculas ni acentos y solo cuenta la frase completa ("nomina" no coincide con "nominal").
+- Cada frase pertenece a una sola categoría; si ya está en otra, el aviso dice dónde.
+
+**Ejemplo:** en la categoría **Viáticos** escribe "reembolso de viaticos" en "Nueva frase..." y presiona Enter. Un correo con asunto "RE: Reembolso de Viáticos octubre" llega a la IA con la pista "Viáticos".
+
+**Consejos:** prefiere frases que distingan una categoría de otra ("factura es correcta", "reembolso de viaticos") sobre palabras generales ("factura"). Corrige con el lápiz del chip y quita con la ✕.
+
+**Quién:** tú siempre; al Manager se le da con el permiso **"Gestionar palabras clave"** en Permisos (al Usuario nunca).
 
 ---
 
@@ -175,6 +192,23 @@ Siempre hace falta que el ticket tenga activados los avisos al solicitante y que
 
 **Precaución:** apagar "Creación" silencia los correos de creación, también los de tickets que llegan por correo.
 
+### Gestión por correo
+
+Según las respuestas del correo, la IA sugiere (o hace, si la plataforma lo encendió) el cambio de estado del
+ticket. En la sección **"Gestión por correo"** eliges qué estado de tu flujo usa en cada caso:
+
+| Caso | Estado que debe ser | Ejemplo |
+|---|---|---|
+| El equipo atiende | En curso | En progreso |
+| En espera del solicitante | En espera | En espera del solicitante |
+| En espera de un tercero | En espera | En espera de tercero |
+| Resuelto, falta confirmación | En curso o En espera | Resuelto, por confirmar |
+| Cerrado al confirmar | Cerrado · Resuelto | Cerrado |
+
+Solo aparecen los estados que encajan y cada estado sirve para un caso. **"— Ninguno —"** apaga ese caso.
+Si no tienes el estado (por ejemplo, una espera), créalo arriba con su categoría y **habilita sus
+transiciones**: la IA solo mueve por transiciones permitidas. Las esperas pausan la fecha límite.
+
 ---
 
 ## 5. Gestionar permisos (pantalla Gestión de Permisos)
@@ -190,6 +224,8 @@ La matriz de permisos define qué puede hacer cada rol. Como Admin puedes modifi
 
 ### Permisos que PUEDES cambiar para roles Manager y Usuario:
 CREATE_TICKET, EDIT_TICKET, CHANGE_STATUS, ADD_COMMENT, VIEW_ATTACHMENTS, UPLOAD_ATTACHMENT, DELETE_ATTACHMENT, VIEW_TICKET_EVENTS, VIEW_DASHBOARD, REVIEW_DRAFTS
+
+`MANAGE_KEYWORDS` ("Gestionar palabras clave") se le puede dar al **Manager**, nunca al Usuario. Solo aparece en la matriz si la plataforma encendió las palabras clave para tu organización.
 
 ### Permisos que NO PUEDES cambiar (bloqueados por el sistema):
 - `VIEW_TICKETS` — siempre TRUE para todos, no modificable
@@ -219,31 +255,26 @@ Archivar oculta un ticket de las vistas normales sin eliminarlo ni cambiar su es
 
 **Pasos:**
 1. Abre el detalle del ticket
-2. Busca la opción **"Archivar"** en el menú de acciones
-3. Confirma la acción
+2. En la barra de acciones haz clic en **"⋯"** y elige **"Archivar ticket"**
+3. Confirma con **"Archivar"** en el mismo menú
 
-**Efecto:** el campo `isArchived` pasa a `true`. El ticket deja de aparecer en búsquedas y listas estándar pero sigue en la base de datos.
+**Efecto:** el ticket deja de aparecer en el tablero, la lista y las búsquedas, pero sigue en la base de datos con su estado y su historial. Se abre con su enlace y su detalle ofrece **"Desarchivar"**.
 
 **Importante:** archivar no cierra el ticket. Si quieres archivar y cerrar, primero ciérralo y luego archívalo.
 
+### Pantalla "Archivados"
+
+En el menú de la izquierda, **"Archivados"** (junto a Borradores) lista los tickets archivados con el **motivo** por el que se archivaron: Archivado a mano, Aviso automático, Copia del equipo, No requiere acción, Para conocimiento, Duplicado o Prueba. Lo que archivas desde el detalle queda como **"Archivado a mano"**; los demás motivos los pone un proceso automático (por ejemplo, el recálculo de tickets), y en la columna **"Por"** aparece **"Regla"**.
+
+- Arriba, cada motivo muestra cuántos tickets tiene; haz clic para ver solo esos. El buscador y el filtro **"Regla o persona"** acotan la lista.
+- **"Abrir"** muestra el detalle; el aviso **"Ticket archivado"** dice su motivo.
+- **"Restaurar"** (solo Admin) lo devuelve a las vistas en el estado que tenía y borra su motivo.
+
 ---
 
-## 7. Eliminar borradores
+## 7. Borradores que no deben entrar al flujo
 
-A diferencia de Manager (que solo puede aprobar), Admin puede eliminar borradores permanentemente.
-
-**Cuándo eliminar un borrador:**
-- Correos basura (spam) que llegaron al sistema de ingesta
-- Solicitudes duplicadas que ya tienen un ticket activo
-- Borradores creados por error de configuración del sistema de ingesta
-
-**Pasos:**
-1. Ve a la sección **"Revisión de Borradores"**
-2. Abre el borrador que quieres eliminar
-3. Selecciona **"Eliminar"** en las opciones
-4. Confirma — la acción es irreversible
-
-**Advertencia:** la eliminación de un borrador es permanente. A diferencia de los tickets archivados, un borrador eliminado no puede recuperarse.
+Los borradores **no se pueden rechazar ni eliminar** desde el portal (tampoco el Admin): la Bandeja de revisión solo los aprueba. Si un borrador es correo basura o un duplicado, apruébalo y después archívalo desde su detalle (sección 6). Así queda el registro de que llegó y de quién lo descartó.
 
 ---
 
@@ -255,5 +286,4 @@ A diferencia de Manager (que solo puede aprobar), Admin puede eliminar borradore
 | MANAGE_USERS | Crear, editar y desactivar usuarios |
 | MANAGE_CLASSIFICATIONS | Gestionar áreas y categorías y exportar la revisión del clasificador |
 | MANAGE_WORKFLOW | Configurar estados y transiciones del sistema |
-| Eliminar borradores | Los Managers solo pueden aprobar |
 | Actualizar matriz de permisos | Cambiar qué puede hacer cada rol |
