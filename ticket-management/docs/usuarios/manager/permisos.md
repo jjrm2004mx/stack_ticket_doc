@@ -22,7 +22,7 @@ Las acciones están agrupadas por la parte del portal que controlan.
 | Ver tickets | ✅ Siempre activo | Abrir el tablero, la lista y el detalle de los tickets que te corresponden |
 | Ver tickets sin asignar | ✅ Activo | Ver también los tickets que aún no tienen responsable |
 | Ver todos los tickets | ✅ Activo | Ver todos los tickets de la organización |
-| Crear tickets | ✅ Activo | Botón «+ Nuevo ticket» |
+| Crear tickets | ✅ Activo | Botón «Nuevo ticket» |
 
 ### 🧾 Trabajo en el ticket
 

@@ -16,12 +16,12 @@ Este documento describe paso a paso todo lo que puedes hacer como Usuario en el 
 Un ticket es una solicitud formal al equipo de soporte. Puedes crear uno cuando tengas un problema, necesites ayuda o quieras reportar algo.
 
 **Pasos:**
-1. En la barra de la vista haz clic en **"+ Nuevo ticket"**. Se abre un panel a la derecha que indica en qué estado empezará ("Se crea como …")
+1. En la barra de la vista haz clic en **"Nuevo ticket"**. Se abre un panel a la derecha que indica en qué estado empezará ("Se crea como …")
 2. Completa el formulario:
    - **Título** *(obligatorio)*: describe el problema en una frase corta y clara. Máximo 255 caracteres. Ejemplo: "No puedo acceder al sistema desde mi computadora"
    - **Descripción** *(opcional pero recomendada)*: explica el problema con detalle. Incluye qué pasó, cuándo ocurrió, qué intentaste hacer. Máximo 10,000 caracteres
    - **Solicitante** (recuadro de la derecha): la persona a nombre de quien se crea el ticket (por ejemplo, un cliente que llamó): nombre, correo y **Medio de contacto** (Teléfono, Presencial, Correo, Chat u Otro). Si escribes un correo válido se marca sola la casilla **"Puede recibir avisos por correo"**; puedes desmarcarla. Quien crea el ticket no recibe avisos por crearlo
-   - **Prioridad** (cuatro botones; Media por defecto): indica la urgencia
+   - **Prioridad** (elígela en la lista, con su punto de color; Media por defecto): indica la urgencia
      - `Baja` — puede esperar, no es urgente
      - `Media` — necesita atención en tiempo razonable
      - `Alta` — afecta tu trabajo, necesita atención pronto

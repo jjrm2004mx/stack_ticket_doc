@@ -162,17 +162,9 @@ Ver documento `admin/permisos.md` para la referencia completa.
 
 ## 5. Revisión de borradores (vista Admin)
 
-Además de aprobar borradores (igual que Manager), Admin puede **eliminarlos**.
+El Admin revisa y aprueba borradores igual que el Manager, en la **Bandeja de revisión** (menú **"Borradores"**; ver `manager/flujos.md`, sección 7): con "Correo original" y los adjuntos (solo de consulta) a la vista, decide prioridad, área y categoría y, si aplica, a quién asignarlo, y presiona **"Aprobar"**.
 
-**Cuándo eliminar vs aprobar:**
-- **Aprobar:** el borrador es una solicitud legítima que debe entrar al flujo
-- **Eliminar:** el borrador es spam, duplicado, o fue creado por error del sistema de ingesta
-
-**Pasos para eliminar:**
-1. Ve a Revisión de Borradores
-2. Abre el borrador
-3. Selecciona **"Eliminar"**
-4. Confirma — irreversible
+Los borradores **no se pueden rechazar ni eliminar** desde el portal, tampoco el Admin. Un borrador que no debe entrar al flujo (spam o duplicado) se aprueba y después se archiva desde su detalle (sección 6).
 
 ---
 
@@ -182,12 +174,12 @@ Además de aprobar borradores (igual que Manager), Admin puede **eliminarlos**.
 
 **Pasos:**
 1. Abre el detalle del ticket a archivar
-2. Selecciona **"Archivar"** en el menú de acciones
-3. Confirma
+2. En la barra de acciones haz clic en **"⋯"** y elige **"Archivar ticket"**
+3. Confirma con **"Archivar"** en el mismo menú
 
-**Resultado:** `isArchived = true`. El ticket deja de aparecer en búsquedas y listas normales pero permanece en la base de datos.
+**Resultado:** el ticket deja de aparecer en el tablero, la lista y las búsquedas, pero permanece en la base de datos con su estado y su historial.
 
-**Para ver tickets archivados:** en la lista principal activa el filtro **"Incluir archivados"** (si está disponible en la interfaz) o consulta directamente en la base de datos.
+**Para ver un ticket archivado:** ábrelo con su enlace (`/tickets/<id>`); el detalle muestra **"Ticket archivado"** y el botón **"Desarchivar"**, que lo devuelve a las vistas en el estado que tenía. No hay un filtro de archivados en la lista.
 
 ---
 
@@ -209,6 +201,6 @@ Los tickets que llegan de un canal muestran en su detalle **Origen: ✉ canal (b
 1. **Cambios de workflow:** siempre comunica al equipo antes de modificar transiciones o estados
 2. **Cambios de permisos:** documenta por qué cambiaste un permiso — usa los comentarios del sistema si están disponibles
 3. **Desactivación de usuarios:** reasigna tickets antes de desactivar
-4. **Eliminación de borradores:** revisa el contenido antes de eliminar — puede ser una solicitud legítima mal formateada
+4. **Borradores dudosos:** revisa "Correo original" y los adjuntos antes de aprobar; si no deben entrar al flujo, apruébalos y archívalos
 5. **Áreas y categorías:** antes de agregar una nueva, verifica que no existe una similar con otro nombre
 6. **Múltiples Admins:** es recomendable tener al menos dos Admins para evitar puntos únicos de falla en la administración

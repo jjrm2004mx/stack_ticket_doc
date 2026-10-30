@@ -32,7 +32,7 @@ Abierto (Nuevo, inicial) → En progreso (En curso) → En revisión (En curso) 
 ## Cambiar el estado de un ticket
 
 - **Tablero:** arrastra la tarjeta a otra columna. Si la transición no está configurada aparece "Transición no permitida en el flujo configurado: <origen> → <destino>".
-- **Detalle:** el menú "Estado" del encabezado ofrece cada estado al que se puede pasar desde el estado actual.
+- **Detalle:** el campo "Estado", arriba de la columna derecha, ofrece cada estado al que se puede pasar desde el estado actual.
 - **Reabrir:** un ticket en un estado Cerrado solo se puede reabrir si tu organización habilitó una transición que salga de ese estado.
 
 Un ticket archivado no cambia de estado. Un ticket en un estado Cerrado no se edita (título, descripción, prioridad, fecha límite, solicitante, área y categoría), pero sí acepta comentarios, adjuntos y asignación.

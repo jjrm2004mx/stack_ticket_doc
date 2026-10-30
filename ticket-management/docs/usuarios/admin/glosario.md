@@ -12,7 +12,7 @@ Definiciones de todos los términos del sistema con contexto técnico y de negoc
 ---
 
 **Ticket**
-Registro formal de una solicitud, problema o tarea. Modelo central del sistema. Campos clave: `id` (UUID), `title`, `description`, `status`, `priority`, `type`, `createdBy`, `assignedTo`, `createdAt`, `updatedAt`, `closedAt`, `closedBy`, `closedOutcome`, `isArchived`, `isDraft`, `classificationId`, `categoryId`, `requesterEmail`, `requesterName`.
+Registro formal de una solicitud, problema o tarea. Modelo central del sistema. Campos clave: `id` (UUID), `title`, `description`, `status`, `priority`, `dueDate`, `createdBy`, `assignedTo`, `createdAt`, `updatedAt`, `closedAt`, `closedBy`, `closedOutcome`, `isArchived`, `isDraft`, `classificationId`, `categoryId`, `requesterEmail`, `requesterName`.
 
 **Estado**
 Etapa del ticket en el workflow de la organización. Cada estado tiene un nombre libre, un código técnico fijo (`status` en la API, por ejemplo `OPEN`) y una categoría del sistema: Nuevo, En curso, En espera o Cerrado (con resultado Resuelto o Cancelado). El comportamiento sigue la categoría. Es nulo cuando el ticket es un borrador.
