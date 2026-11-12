@@ -1,5 +1,7 @@
 # Notas de diseño para la etapa 2
 
+> **Nota del 2026-11-12:** la etapa 2 ya convirtió estas notas en propuestas OpenSpec. Lo vigente está en las specs de cada cambio y en `ETAPA_2_DISENO.md`, cuya sección 7 lista lo que cambió respecto a estas notas (el catálogo ya no viaja en cada petición, el tope de filas va en el controlador, los parámetros van por posición y se cierra el esquema `public` completo). Este documento se conserva por su razonamiento.
+
 **Fecha:** 2026-11-11
 **Para qué:** dejar escrito el razonamiento técnico que no está en el plan, para redactar con él las propuestas OpenSpec y las pruebas de la compuerta 1.
 **Estado de cada afirmación:** lo marcado **[verificado]** se leyó en el código. Lo marcado **[por probar]** es conocimiento de PostgreSQL o del controlador que debe confirmarse ejecutando en la etapa 3.
@@ -15,7 +17,7 @@
 | `ticket_insights_owner` | Sin acceso de entrada, sin saltarse la seguridad por fila | `SELECT` solo sobre las columnas de las tablas base que usan las vistas. Dueño de las vistas |
 | `ticket_insights` | Con acceso de entrada, sin saltarse la seguridad por fila | Uso del esquema `insights` y `SELECT` sobre sus vistas. Nada sobre `public` |
 
-Ajustes fijados en `ticket_insights`: tiempo máximo de consulta, transacciones de solo lectura por defecto, tiempo máximo de transacción ociosa, zona horaria del negocio, `search_path = insights` y un límite bajo de conexiones. La contraseña entra por `afterMigrate.sql`, como las de los otros roles **[verificado: patrón existente]**.
+Ajustes fijados en `ticket_insights`: tiempo máximo de consulta, transacciones de solo lectura por defecto, tiempo máximo de transacción ociosa, `search_path = insights` y un límite bajo de conexiones. La zona horaria del negocio la fija el ejecutor en cada transacción (trampa T9). Las columnas exactas que `ticket_insights_owner` puede leer están en la sección 4 de `ETAPA_1_DEFINICION_DE_VISTAS.md`. La contraseña entra por `afterMigrate.sql`, como las de los otros roles **[verificado: patrón existente]**.
 
 ### Trampas
 
@@ -28,7 +30,8 @@ Ajustes fijados en `ticket_insights`: tiempo máximo de consulta, transacciones 
 | T5 | El controlador JDBC puede ejecutar varias sentencias separadas por `;` en una sola llamada **[por probar]**. Envolver la consulta en `SELECT * FROM ( … ) q LIMIT n` no basta: `) q; SET LOCAL …; SELECT * FROM (` cierra el paréntesis y sigue | TM rechaza cualquier `;`. El motor garantiza una sola sentencia. Probar si el controlador de verdad lo ejecutaría |
 | T6 | Todos los roles pueden usar el esquema `public` por defecto. Una función de ese esquema que nadie haya cerrado sería invocable. Las sensibles ya tienen `REVOKE … FROM PUBLIC` **[verificado: V33 a V38]** | Prueba automática: `ticket_insights` no tiene permiso de ejecución sobre ninguna función de `public` |
 | T7 | `pg_sleep`, `generate_series` y los bloqueos consultivos no filtran datos, pero estorban | Lista blanca del motor y tiempo máximo de consulta |
-| T8 | Si las fechas se guardan como `timestamp` sin zona en UTC, convertirlas mal corre el día | Confirmar el tipo en la etapa 1 y normalizar en la vista |
+| T8 | Las fechas se guardan como `timestamp` sin zona, en UTC **[verificado: `BusinessTime`, `TicketManagementApplication`]**. Convertirlas mal corre el día | Resuelto en la etapa 1: cada vista convierte con la expresión de `BusinessTime.sqlLocal`, usando la zona de la sesión. Ver `ETAPA_1_DEFINICION_DE_VISTAS.md` |
+| T9 | Fijar la zona horaria con `ALTER ROLE … SET timezone` no basta: el controlador JDBC manda la zona de la JVM (UTC) al abrir la conexión y ese valor gana sobre el del rol **[por probar]**. `CURRENT_DATE` y las fechas de las vistas saldrían en UTC | El ejecutor ejecuta `SET LOCAL TIME ZONE '<app.timezone>'` en cada transacción, junto con el tenant. Caso de prueba en la compuerta 1 con la conexión real de TM |
 
 ### El tenant no se puede cambiar: dos variantes
 

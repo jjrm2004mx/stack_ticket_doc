@@ -1,9 +1,9 @@
 # GemIA — Preguntas sobre los datos: plan versión 4
 
 **Fecha:** 2026-11-12
-**Estado:** reparto y decisiones de negocio aprobados. Etapa 1 en curso. **No se escribe código sin hablarlo antes con el dueño.**
+**Estado:** reparto y decisiones de negocio aprobados. Etapas 1 y 2 hechas el 11-12; las propuestas OpenSpec de la etapa 2 tienen el visto bueno del dueño (2026-11-12). Sigue la etapa 3 (compuerta 1). **No se escribe código sin hablarlo antes con el dueño.**
 **Sustituye a:** las versiones 3 y 3.1 de este documento y a `PLAN_TEXT_TO_SQL_WREN.md`.
-**Documentos de apoyo:** `ETAPA_1_ALCANCE_Y_CATALOGO.md` (vistas, significados y preguntas de referencia), `NOTAS_DE_DISENO.md` (diseño técnico razonado), `PASO_A_REVISION_STACK.md` (cómo está el stack) y `ETAPA_1_REVISION_WREN.md` (qué se aprendió de Wren).
+**Documentos de apoyo:** `ETAPA_1_ALCANCE_Y_CATALOGO.md` (vistas, significados y preguntas de referencia), `ETAPA_1_DEFINICION_DE_VISTAS.md` (columnas confirmadas y definición de cada vista), `ETAPA_2_DISENO.md` (mapa de las tres propuestas OpenSpec, decisiones que cruzan repos, tiempos, casos negativos y diferencias con este plan), `NOTAS_DE_DISENO.md` (diseño técnico razonado), `PASO_A_REVISION_STACK.md` (cómo está el stack) y `ETAPA_1_REVISION_WREN.md` (qué se aprendió de Wren).
 
 ---
 
@@ -182,9 +182,9 @@ Wren no se instala. Su licencia (Apache-2.0) permite copiar código conservando 
 
 | # | Etapa | Qué incluye | Entregable | Tamaño | Esfuerzo | OCI | ¿Código? |
 |---|---|---|---|---|---|---|---|
-| 1 | Alcance y catálogo inicial — **en curso** | Hecho: vistas lógicas, significados y preguntas de referencia. Falta: confirmar columnas reales de TM, escribir la definición de cada vista y calcular los resultados esperados | Definición de vistas; preguntas con resultado esperado | 1 día más | Alto | No | No |
-| 2 | Diseño y propuestas OpenSpec | Capas de §4 con las dos variantes. Contrato del motor y formato del catálogo. Ejecutor. Permisos, interruptor, registro y consumo. Tiempos. Casos negativos. Propuestas OpenSpec de TM, del motor y de `infra-monitoring` | Cambios OpenSpec listos para aprobar | 2 días | **Extra alto** | No | No |
-| 3 | **Compuerta 1:** aislamiento en la base | Rama de TM con la migración y las pruebas de los casos negativos. Se corre en Rocky en una carpeta temporal, sin tocar el stack, con la suite completa de TM | Evidencia pasa/falla; variante elegida. **Si no hay forma de aislar, se detiene aquí sin nada fusionado** | 1–2 días | **Alto** | No | Sí, en rama |
+| 1 | Alcance y catálogo inicial — **hecha el 11-12** | Vistas lógicas, significados, preguntas de referencia, columnas reales de TM confirmadas y definición de cada vista (`ETAPA_1_DEFINICION_DE_VISTAS.md`). Los resultados esperados de las preguntas pasaron a la etapa 3 por decisión del dueño (11-12): se calculan cuando las vistas existan | Definición de vistas; preguntas de referencia | Hecha | Alto | No | No |
+| 2 | Diseño y propuestas OpenSpec — **hecha y aprobada el 11-12** | Tres cambios escritos y validados: `preguntas-sobre-los-datos` (TM), `motor-inicial` (motor, provisionalmente en `stack_ticket_doc/text-to-sql/openspec/`) y `motor-en-el-ecosistema` (`infra-monitoring`). Mapa y casos negativos en `ETAPA_2_DISENO.md` | Cambios OpenSpec listos para aprobar | Hecha | **Extra alto** | No | No |
+| 3 | **Compuerta 1:** aislamiento en la base | Rama de TM con la migración y las pruebas de los casos negativos (B1 a B14 de `ETAPA_2_DISENO.md` §8). Resultados esperados de las preguntas de referencia. Se corre en Rocky en una carpeta temporal, sin tocar el stack, con la suite completa de TM | Evidencia pasa/falla; variante elegida. **Si no hay forma de aislar, se detiene aquí sin nada fusionado** | 1–2 días | **Alto** | No | Sí, en rama |
 | 4 | Motor | Repo nuevo con su plantilla y OpenSpec. Catálogo de TM. Validador portado de Wren. Filtro obligatorio y parámetros. Adaptadores de modelo. Llave por aplicación. Cuatro rutas. Pruebas con todos los casos negativos, sin modelo. Runbooks. Contenedor | Motor corriendo en local y en Rocky | 6–7 días | **Alto**; validador y filtros, **extra alto** | Poco | Sí |
 | 5 | TM, parte de servidor | Migración definitiva. Ejecutor. Ruta y cliente del motor. Valores del cliente. Permisos. Interruptor del operador. Registro y consumo. Pruebas de aislamiento, permisos, interruptor, sesión de soporte y coincidencia con el catálogo | Función disponible por API, apagada para todos | 3–4 días | **Alto**; ejecutor y aislamiento, **extra alto** | No | Sí |
 | 6 | **Compuerta 2:** punta a punta | En Rocky, encendida solo en el cliente de prueba. Casos negativos con el modelo. El filtro del motor a solas, con la seguridad por fila apagada en una base de prueba. Muestra de las preguntas de referencia. Tiempos por paso | Seguridad al 100 %; exactitud y latencia medidas | 1–2 días | **Alto** | **Sí (muestra)** | Ajustes |

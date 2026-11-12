@@ -1,22 +1,20 @@
-# Etapa 1 — Alcance y catálogo inicial (en curso)
+# Etapa 1 — Alcance y catálogo inicial
 
-**Fecha:** 2026-11-11
-**Plan:** `PLAN_PREGUNTAS_SOBRE_LOS_DATOS.md` (versión 3.1), etapa 1
-**Estado:** decisiones de diseño hechas. **Falta verificar contra el esquema físico (§7) y cerrar cuatro decisiones (§6).**
-**Base usada:** las specs de TM `data-model`, `dashboard-analytics`, `ticket-visibility`, `rbac-permissions` y `multi-tenancy`. Todavía no se leyeron las migraciones tabla por tabla, así que **los nombres físicos de columnas están sin confirmar**.
+**Fecha:** 2026-11-11; actualizado el 2026-11-12
+**Plan:** `PLAN_PREGUNTAS_SOBRE_LOS_DATOS.md` (versión 4), etapa 1
+**Estado:** etapa cerrada. Decisiones de diseño hechas y aprobadas (§6). Columnas confirmadas contra el código de TM y vistas definidas en **`ETAPA_1_DEFINICION_DE_VISTAS.md`**. Los resultados esperados se calculan en la etapa 3 (§0).
+**Base usada:** las specs de TM `data-model`, `dashboard-analytics`, `ticket-visibility`, `rbac-permissions` y `multi-tenancy`, y después las migraciones y el código (lista en `ETAPA_1_DEFINICION_DE_VISTAS.md`).
 
 ---
 
 ## 0. Cómo continuar
 
-Lo que queda de la etapa 1 es mecánico:
+1. ~~Leer los archivos de §7 y escribir el `CREATE VIEW` de cada vista de §2.~~ Hecho el 11-12: `ETAPA_1_DEFINICION_DE_VISTAS.md`. **Si ese documento y este difieren, manda aquel**: trae los nombres y columnas definitivos y los hallazgos que cambiaron el diseño.
+2. ~~Pedir visto bueno a las cuatro decisiones de §6.~~ Aprobadas el 11-12.
+3. ~~Calcular el resultado esperado de las preguntas de §5.~~ Pasó a la etapa 3 por decisión del dueño (11-12): se calcula cuando las vistas existan (tarea 1.6 del cambio `preguntas-sobre-los-datos` de TM).
+4. ~~Pasar a la etapa 2.~~ Hecha el 11-12: ver `ETAPA_2_DISENO.md`.
 
-1. Leer los archivos de §7 y escribir el `CREATE VIEW` de cada vista de §2, anotando cualquier columna que no exista como se supuso.
-2. Pedir visto bueno a las cuatro decisiones de §6.
-3. Calcular el resultado esperado de las preguntas de §5 sobre datos de prueba. Requiere consultar la base de Rocky en solo lectura, con permiso previo.
-4. Pasar a la etapa 2 con `NOTAS_DE_DISENO.md`, que ya tiene el diseño técnico razonado.
-
-Las preguntas de §5 están escritas contra los nombres **lógicos** de las vistas. No dependen de los nombres físicos, así que siguen valiendo aunque §7 cambie el origen de alguna columna.
+Las preguntas de §5 están escritas contra los nombres **lógicos** de las vistas. La revisión del esquema cambió solo la pregunta 3 y agregó la 14, la 15 y la 16.
 
 ## 1. Reglas de diseño de las vistas
 
@@ -24,11 +22,13 @@ Las preguntas de §5 están escritas contra los nombres **lógicos** de las vist
 2. **Nombres junto a los identificadores.** Los joins ya vienen resueltos; el modelo no une tablas para traducir un id.
 3. **Toda vista trae `tenant_id`.** Lo necesita el filtro obligatorio del motor.
 4. **"Ticket" significa ticket activo:** ni borradores (`status_id` nulo) ni archivados. Es lo que hace el tablero. **Los borradores y los archivados sí se pueden consultar, pero cada uno en su propia vista** (`drafts` y `archived_tickets`). No van como bandera dentro de `tickets`, porque el modelo olvidaría filtrarla y los conteos saldrían mal.
-5. **Fechas ya en la zona horaria del negocio** (`app.timezone`). Cada momento tiene dos columnas: `*_at` (fecha y hora local) y `*_date` (día local). El modelo nunca convierte zonas. "Hoy" es `CURRENT_DATE`, que debe ser local: el rol de solo lectura lleva fijada la zona horaria.
+5. **Fechas ya en la zona horaria del negocio** (`app.timezone`). Cada momento tiene dos columnas: `*_at` (fecha y hora local) y `*_date` (día local). El modelo nunca convierte zonas. "Hoy" es `CURRENT_DATE`, que debe ser local: el ejecutor de TM fija la zona horaria en cada transacción (fijarla en el rol no basta, ver el hallazgo H2 de `ETAPA_1_DEFINICION_DE_VISTAS.md`).
 6. **Toda métrica con fórmula va calculada en la vista**, no en el SQL del modelo. El tiempo de resolución descuenta las esperas igual que el tablero; pedirle eso al modelo es pedirle que se equivoque.
 7. **Sin texto libre de personas:** ni descripción, ni comentarios, ni correos. Sin datos del solicitante. Sin `due_date`, porque hoy nadie lo escribe.
 
 ## 2. Vistas (esquema `insights`)
+
+> Diseño lógico original. Las columnas definitivas, con su tipo y su origen, están en `ETAPA_1_DEFINICION_DE_VISTAS.md`. Cambios: `states.position` se llama `display_order`; se agregó `channel_name`; `ticket_state_changes` lleva los ids de estado; `archived_tickets` lleva `was_draft`, `archive_reason` y `archived_by_rule`; los días van con decimales.
 
 ### `tickets` — un ticket activo por fila
 
@@ -115,7 +115,7 @@ El SQL está escrito como debe escribirlo el modelo: contra nombres lógicos y s
 |---|---|---|
 | 1 | ¿Cuántos tickets abiertos hay? | `SELECT COUNT(*) AS tickets FROM tickets WHERE is_open` |
 | 2 | ¿Cuántos tickets se crearon este mes? | `SELECT COUNT(*) AS tickets FROM tickets WHERE created_date >= date_trunc('month', CURRENT_DATE)::date` |
-| 3 | ¿Cuántos tickets hay en cada estado? | `SELECT s.state_name, COUNT(t.ticket_id) AS tickets FROM states s LEFT JOIN tickets t ON t.state_id = s.state_id WHERE s.is_active GROUP BY s.state_name, s.position ORDER BY s.position` |
+| 3 | ¿Cuántos tickets hay en cada estado? | `SELECT s.state_name, COUNT(t.ticket_id) AS tickets FROM states s LEFT JOIN tickets t ON t.state_id = s.state_id WHERE s.is_active GROUP BY s.state_name, s.display_order ORDER BY s.display_order` |
 | 4 | ¿Cuántos tickets abiertos tiene cada área? | `SELECT COALESCE(area_name, 'Sin área') AS area, COUNT(*) AS tickets FROM tickets WHERE is_open GROUP BY 1 ORDER BY 2 DESC` |
 | 5 | ¿Quién tiene más tickets abiertos? | `SELECT assignee_name, COUNT(*) AS tickets FROM tickets WHERE is_open AND assignee_id IS NOT NULL GROUP BY assignee_name ORDER BY 2 DESC LIMIT 5` |
 | 6 | ¿Cuántos tickets abiertos están sin asignar? | `SELECT COUNT(*) AS tickets FROM tickets WHERE is_open AND assignee_id IS NULL` |
@@ -126,6 +126,11 @@ El SQL está escrito como debe escribirlo el modelo: contra nombres lógicos y s
 | 11 | ¿Qué categorías de «área X» tienen más tickets este año? | `SELECT category_name, COUNT(*) AS tickets FROM tickets WHERE area_name = '<nombre exacto>' AND created_date >= date_trunc('year', CURRENT_DATE)::date GROUP BY category_name ORDER BY 2 DESC` |
 | 12 | ¿Cuántos tickets abiertos llevan más de 7 días? | `SELECT COUNT(*) AS tickets FROM tickets WHERE is_open AND age_days > 7` |
 | 13 | ¿Se crearon más tickets este mes que el mes pasado? | `SELECT COUNT(*) FILTER (WHERE created_date >= date_trunc('month', CURRENT_DATE)::date) AS este_mes, COUNT(*) FILTER (WHERE created_date < date_trunc('month', CURRENT_DATE)::date) AS mes_pasado FROM tickets WHERE created_date >= (date_trunc('month', CURRENT_DATE) - INTERVAL '1 month')::date` |
+| 14 | ¿Cuántos borradores hay por revisar? | `SELECT COUNT(*) AS borradores FROM drafts` |
+| 15 | ¿Cuántos tickets se archivaron este mes? | `SELECT COUNT(*) AS tickets FROM archived_tickets WHERE archived_date >= date_trunc('month', CURRENT_DATE)::date` |
+| 16 | ¿Por qué motivo se archivaron los tickets este año? | `SELECT archive_reason, COUNT(*) AS tickets FROM archived_tickets WHERE archived_date >= date_trunc('year', CURRENT_DATE)::date GROUP BY archive_reason ORDER BY 2 DESC` |
+
+Las preguntas 14 a 16 solo aplican a un rol con `REVIEW_DRAFTS`.
 
 **Preguntas que no deben producir consulta:**
 
@@ -150,18 +155,19 @@ Estas preguntas usan `COUNT`, `AVG`, `ROUND`, `COALESCE`, `date_trunc`, `CURRENT
 | 3 | Pregunta sin periodo | Todo el histórico, y la respuesta lo dice |
 | 4 | Borradores y archivados | **Resuelta el 11-12: entran**, cada uno en su vista y con el permiso `REVIEW_DRAFTS` |
 
-Las decisiones 1 a 3 quedaron aprobadas el 2026-11-12 como se recomendaron. Faltan dos preguntas de referencia: "¿cuántos borradores hay por revisar?" (`SELECT COUNT(*) FROM drafts`) y "¿cuántos tickets se archivaron este mes?" (`SELECT COUNT(*) FROM archived_tickets WHERE archived_date >= date_trunc('month', CURRENT_DATE)::date`).
+Las decisiones 1 a 3 quedaron aprobadas el 2026-11-12 como se recomendaron. Las preguntas de borradores y archivados ya están en §5 (14 a 16).
 
-## 7. Pendiente de verificar leyendo el esquema
+## 7. Verificado leyendo el esquema (2026-11-12)
 
-Rutas bajo `TICKET-MANAGEMENT/backend/src/main/`.
+Todo lo de esta lista quedó confirmado. El detalle y la definición de cada vista están en `ETAPA_1_DEFINICION_DE_VISTAS.md`.
 
-| Qué confirmar | Dónde |
+| Qué se confirmó | Resultado |
 |---|---|
-| Columnas reales de `tickets`: título, área, categoría, responsable, cómo se marca un archivado, y si las fechas son `timestamp` o `timestamptz` | `resources/db/migration/V1__init_schema.sql`, `V44__ticket_sort_columns.sql` y los `ALTER TABLE tickets` posteriores |
-| Si `tickets.closed_at` y `closed_outcome` se mantienen siempre, o si el cierre debe salir del historial como hace el tablero | `java/com/ticketmanagement/application/DashboardService.java` |
-| El SQL exacto del MTTR con descuento de esperas, para copiarlo en `resolution_days` y `waiting_days` | `DashboardService.java` |
-| Columnas de `ticket_status_history`: estados de origen y destino, categoría, desenlace, fecha | `V1` y las migraciones del flujo por cliente |
-| Columnas de `workflow_states`, `ticket_classifications`, `ticket_categories` y `users` (nombre visible, rol, estado, usuarios de sistema) | `V1` y posteriores |
-| Cómo forma el portal el folio corto del ticket | `frontend/src` |
-| Cómo se distingue un ticket de correo de uno creado a mano | `tickets.channel_id`, `contact_medium` |
+| Columnas reales de `tickets` | Área = `classification_id`; archivado = `is_archived` con `archived_at` y `archive_reason`; borrador = `status_id` vacío |
+| Tipo de las fechas | `TIMESTAMP` sin zona, guardadas en UTC. La vista las convierte |
+| `closed_at` y `closed_outcome` | Se mantienen siempre; el cierre vigente sale de `tickets` |
+| MTTR con descuento de esperas | Copiado de `DashboardService.RESOLUTION_CTE` en `resolution_days` |
+| `ticket_status_history` | `from_state_id`, `to_state_id`, `to_category`, `to_outcome`, `changed_at` |
+| Estados, áreas, categorías y usuarios | Confirmadas; usuarios de sistema = `status = 'SYSTEM'` |
+| Folio | Primeros 8 caracteres del `id`, en mayúsculas |
+| Origen | `channel_id` no vacío = `CORREO`; si no, `PORTAL` |
