@@ -55,6 +55,7 @@ Las acciones están agrupadas por la parte del portal que controlan.
 |---|---|---|
 | Ver dashboard de métricas | ✅ Activo | Vista «Métricas» con KPIs, gráficas y rendimiento por agente |
 | Usar asistente | ✅ Activo | Widget del asistente con respuestas de la documentación |
+| Preguntar por los datos | ❌ Inactivo (el Admin lo puede activar) | Hacer preguntas sobre los tickets de la empresa en el modo «Mis datos» del asistente. Solo existe si tu organización tiene contratada la función «Preguntas sobre los datos»; también necesita «Ver todos los tickets» |
 
 ### ⚙️ Administración
 

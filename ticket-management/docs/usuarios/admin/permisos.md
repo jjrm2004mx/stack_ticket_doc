@@ -55,6 +55,7 @@ Las acciones están agrupadas por la parte del portal que controlan. Cada grupo 
 |---|---|---|---|---|
 | Ver dashboard de métricas (VIEW_DASHBOARD) | Vista «Métricas» con KPIs, gráficas y rendimiento por agente | ❌ | ✅ | ✅ Fijo |
 | Usar asistente (USE_AGENT) | Widget del asistente con respuestas de la documentación | ✅ | ✅ | ✅ Fijo |
+| Preguntar por los datos (ASK_DATA) | Hacer preguntas sobre los tickets de la empresa en el modo «Mis datos» del asistente y recibir la respuesta con su tabla de datos. También necesita «Ver todos los tickets»; para borradores y archivados, «Revisar borradores». La fila solo aparece si tu organización tiene contratada la función | 🔒 Nunca | ❌ (lo puedes activar) | ✅ Fijo |
 
 ### ⚙️ Administración — configuración de la organización
 
@@ -76,6 +77,8 @@ Estas reglas no se pueden cambiar desde la pantalla. Las casillas fijas se ven c
 - **Ver tickets** está siempre activo para todos los roles.
 - **Solo Admin:** Archivar tickets, Gestionar usuarios, Gestionar áreas y categorías y Gestionar workflow no se pueden dar a Usuario ni a Manager.
 - **Admin tiene fijas** todas las acciones excepto tres opcionales: Revisar borradores, Gestionar áreas y categorías y Gestionar workflow.
+- **Solo hasta Manager:** Gestionar palabras clave, Ver por qué quedó así, Configurar la IA y Preguntar por los datos se le pueden dar al Manager, nunca al Usuario (el editor muestra «Nunca»).
+- **Funciones contratadas:** una acción que depende de una función apagada para tu organización (por ejemplo, Preguntar por los datos o Usar asistente) no aparece en la matriz; lo que hayas dado se conserva para cuando la plataforma la vuelva a encender.
 - **Gestionar permisos** es solo del rol Admin.
 
 > **Precaución:** si quitas a Admin «Gestionar áreas y categorías» o «Gestionar workflow», nadie podrá abrir esas pantallas hasta que lo vuelvas a activar aquí.
