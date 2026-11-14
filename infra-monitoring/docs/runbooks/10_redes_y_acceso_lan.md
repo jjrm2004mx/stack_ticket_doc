@@ -33,8 +33,8 @@ todo lo demás escucha en `127.0.0.1` y se usa por túnel.
 | 9090 | Prometheus | No | Túnel (hasta 2026-10-17 respondía en la LAN) |
 | 3000 | Grafana | Sí — por defecto `admin/admin` | Túnel |
 | 5679 | n8n | No (contiene credenciales de Microsoft Graph) | Túnel |
-| 3001 | support-console | No — el rol se elige en un desplegable | Túnel |
-| 8080, 8081, 8000, 8001, 8002 | APIs internas | No | Túnel |
+| 3001 | support-console | No propia — herramienta de plataforma: su Nginx agrega la llave de plataforma de ticket-agent; quien llega por túnel SSH es operador | Túnel — publicarla en la LAN exige antes un login |
+| 8080, 8081, 8000, 8001, 8002, 8003 | APIs internas (8003 = motor `text-to-sql`, opcional; pide llave de servicio) | No | Túnel |
 | 9000/9001, 9002/9003 | MinIO API / consola | Consola sí | Túnel |
 | 5433, 5434, 5435 | PostgreSQL | Sí (usuario/password de BD) | Túnel — nunca abrir |
 | 6380, 6381 | Redis | Contraseña | Túnel — nunca abrir |
@@ -60,13 +60,14 @@ ssh -N -L 9090:localhost:9090 -L 3000:localhost:3000 -L 5679:localhost:5679 -L 3
 
 Mientras esa ventana siga abierta, en el navegador de **esa** máquina:
 `http://localhost:9090` (Prometheus), `http://localhost:3000` (Grafana),
-`http://localhost:5679` (n8n), `http://localhost:3001` (consola de soporte; usa también
-el 8002 del asistente). Al cerrar la ventana (`Ctrl+C`) el acceso se corta.
+`http://localhost:5679` (n8n), `http://localhost:3001` (consola de soporte; habla con el
+asistente a través de su propio Nginx, así que no necesita el 8002 — el `-L 8002` sirve solo
+para revisar el agente directamente). Al cerrar la ventana (`Ctrl+C`) el acceso se corta.
 
 Túnel completo con **todos** los puertos del ecosistema (una sola línea):
 
 ```powershell
-ssh -N -L 3000:localhost:3000 -L 3001:localhost:3001 -L 3100:localhost:3100 -L 5433:localhost:5433 -L 5434:localhost:5434 -L 5435:localhost:5435 -L 5679:localhost:5679 -L 6380:localhost:6380 -L 6381:localhost:6381 -L 8000:localhost:8000 -L 8001:localhost:8001 -L 8002:localhost:8002 -L 8080:localhost:8080 -L 8081:localhost:8081 -L 8090:localhost:8090 -L 9000:localhost:9000 -L 9001:localhost:9001 -L 9002:localhost:9002 -L 9003:localhost:9003 -L 9011:localhost:9011 -L 9012:localhost:9012 -L 9090:localhost:9090 -L 9100:localhost:9100 -L 11434:localhost:11434 Agente@10.187.21.30
+ssh -N -L 3000:localhost:3000 -L 3001:localhost:3001 -L 3100:localhost:3100 -L 5433:localhost:5433 -L 5434:localhost:5434 -L 5435:localhost:5435 -L 5679:localhost:5679 -L 6380:localhost:6380 -L 6381:localhost:6381 -L 8000:localhost:8000 -L 8001:localhost:8001 -L 8002:localhost:8002 -L 8003:localhost:8003 -L 8080:localhost:8080 -L 8081:localhost:8081 -L 8090:localhost:8090 -L 9000:localhost:9000 -L 9001:localhost:9001 -L 9002:localhost:9002 -L 9003:localhost:9003 -L 9011:localhost:9011 -L 9012:localhost:9012 -L 9090:localhost:9090 -L 9100:localhost:9100 -L 11434:localhost:11434 Agente@10.187.21.30
 ```
 
 Si un puerto ya está ocupado en esa máquina, se cambia solo el lado local:
@@ -89,6 +90,7 @@ ssh -N `
   -L 8080:localhost:8080 `
   -L 8001:localhost:8001 `
   -L 8002:localhost:8002 `
+  -L 8003:localhost:8003 `
   -L 8000:localhost:8000 `
   -L 8081:localhost:8081 `
   -L 9001:localhost:9001 `
@@ -148,6 +150,7 @@ Host rocky-tunel
     LocalForward 8080 localhost:8080
     LocalForward 8001 localhost:8001
     LocalForward 8002 localhost:8002
+    LocalForward 8003 localhost:8003
     LocalForward 8000 localhost:8000
     LocalForward 8081 localhost:8081
     LocalForward 9001 localhost:9001

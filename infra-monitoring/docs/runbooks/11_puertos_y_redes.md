@@ -73,6 +73,12 @@ también desde cualquier otra máquina de la oficina (`10_redes_y_acceso_lan.md`
 |---|---|---|---|---|
 | `til-n8n` | 5679 | 5678 | http://localhost:5679 | n8n — ingesta por canal y webhooks de envío |
 
+### text-to-sql (opcional, en `~/stack_ticket/text-to-sql`)
+
+| Contenedor | Puerto host | Puerto interno | URL en Rocky | Descripción |
+|---|---|---|---|---|
+| `text-to-sql` | 8003 (solo `127.0.0.1`) | 8003 | http://localhost:8003 | Motor de «Preguntas sobre los datos»: pregunta + catálogo → SQL validado; filas → texto. Sin base ni volumen |
+
 ### infra-monitoring
 
 | Contenedor | Puerto host | Puerto interno | URL en Rocky | Descripción |
@@ -90,14 +96,16 @@ también desde cualquier otra máquina de la oficina (`10_redes_y_acceso_lan.md`
 Lista completa de puertos publicados en el host:
 
 ```
-3000 3001 3100 5433 5434 5435 5679 6380 6381 8000 8001 8002 8080 8081 8090
+3000 3001 3100 5433 5434 5435 5679 6380 6381 8000 8001 8002 8003 8080 8081 8090
 9000 9001 9002 9003 9011 9012 9090 9100 11434
 ```
+
+(8003 solo si el motor `text-to-sql` está instalado.)
 
 Comprobar en Rocky, con el stack abajo, que ninguno esté ocupado:
 
 ```bash
-for p in 3000 3001 3100 5433 5434 5435 5679 6380 6381 8000 8001 8002 8080 8081 8090 \
+for p in 3000 3001 3100 5433 5434 5435 5679 6380 6381 8000 8001 8002 8003 8080 8081 8090 \
          9000 9001 9002 9003 9011 9012 9090 9100 11434; do
   ss -ltn "sport = :$p" | grep -q LISTEN && echo "OCUPADO: $p"
 done
@@ -119,7 +127,7 @@ Rocky hoy.
 
 | Red | Subnet en Rocky | Propósito |
 |---|---|---|
-| `ticket-management-network` | 10.89.0.0/24 | Bus entre stacks: solo servicios que se hablan de un stack a otro |
+| `ticket-management-network` | 10.89.0.0/24 | Bus entre stacks: solo servicios que se hablan de un stack a otro (incluye el motor `text-to-sql`) |
 | `ticket-classification-network` | 10.89.2.0/24 | Clasificación: LLM, BD, Redis y MinIO del clasificador |
 | `observability-network` | 10.89.3.0/24 | Monitoreo, asistente y servidores MCP |
 
@@ -149,6 +157,7 @@ Rocky hoy.
 | `notification-service` | notification-service_notification-network, ticket-management-network |
 | `notification-db` | notification-service_notification-network |
 | `til-n8n` | ticket-ingestion-light_stack, ticket-management-network |
+| `text-to-sql` | ticket-management-network (solo esa; no tiene red interna) |
 | `ticket-agent` | observability-network, ticket-management-network |
 | `loki-mcp-server`, `prometheus-mcp-server` | observability-network |
 | `sc-nginx` | support-console_default |
@@ -224,6 +233,19 @@ ticket-agent ─► Oracle ADB y OCI GenAI (internet)
              ─► loki-mcp-server:9011, prometheus-mcp-server:9012
 ```
 
+### Preguntas sobre los datos (motor `text-to-sql`, opcional)
+
+```
+Portal («Mis datos») ─► ticket-system-backend POST /api/v1/insights/query
+  ticket-system-backend ─► http://text-to-sql:8003/v1/... (X-Service-Key = ENGINE_SERVICE_KEY)
+                             (ticket-management-network)
+                             text-to-sql ─► OCI Generative AI (internet)
+  ticket-system-backend ─► ticket-db (rol de solo lectura sobre las vistas `insights`, bajo RLS)
+```
+
+El motor nunca entra a la base: genera y valida el SQL; el backend lo ejecuta y le devuelve
+las filas para redactar la respuesta. Sin el motor solo esa ruta contesta `503`.
+
 ### Métricas (Prometheus, `prometheus.yml`)
 
 | Job | Destino |
@@ -233,6 +255,7 @@ ticket-agent ─► Oracle ADB y OCI GenAI (internet)
 | `langchain-agent` | `langchain-agent:8001/metrics` |
 | `langchain-api` | `langchain-api:8000/metrics` |
 | `ticket-agent` | `ticket-agent:8002/metrics` |
+| `text-to-sql` | `text-to-sql:8003/metrics` (DOWN si el motor no está instalado) |
 | `node-exporter` | `node-exporter:9100` |
 | `prometheus` | `localhost:9090` |
 

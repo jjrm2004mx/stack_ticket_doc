@@ -248,7 +248,7 @@ sync:    ./sync-repos.sh
 
 ## 8. sync-repos.sh
 
-Sincroniza los 5 repos desde sus remotos en GitHub:
+Sincroniza los 6 repos de `~/stack_ticket` desde sus remotos en GitHub (salta `text-to-sql` si no está clonado):
 
 ```bash
 ./sync-repos.sh           # Sincroniza si no hay cambios locales
