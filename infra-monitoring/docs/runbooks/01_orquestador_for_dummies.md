@@ -14,7 +14,7 @@ en el orden correcto, y el registro de todo lo que ha pasado.
 
 | Pieza de la sala de control | Pieza del ecosistema |
 |---|---|
-| El gran interruptor principal | `startup.sh` — arranca los 5 repos en orden |
+| El gran interruptor principal | `startup.sh` — arranca los 6 repos en orden (`text-to-sql` opcional) |
 | Los paneles de métricas | Grafana — dashboards del stack |
 | El recolector de datos | Prometheus — scrapeó métricas de cada servicio |
 | El archivo de logs | Loki — centraliza los logs de todos los contenedores |
@@ -30,7 +30,7 @@ Este repo tiene **dos roles** que es importante no confundir:
 
 ### Rol 1 — Orquestador del ecosistema
 
-`startup.sh` es el script maestro que arranca los 5 repos en el orden correcto,
+`startup.sh` es el script maestro que arranca los 6 repos (el motor `text-to-sql` es opcional) en el orden correcto,
 crea las redes Podman compartidas y detecta el entorno (WSL vs Linux nativo).
 
 ```bash
@@ -142,7 +142,7 @@ leen al arrancar para configurar sus URLs públicas.
 | `startup.sh` | Orquestador maestro del ecosistema |
 | `start.sh` | Levanta solo el stack de infra-monitoring |
 | `diagnostico-stack.sh` | Diagnóstico completo de salud del ecosistema |
-| `sync-repos.sh` | Sincroniza los 5 repos desde GitHub |
+| `sync-repos.sh` | Sincroniza los 6 repos de `~/stack_ticket` desde GitHub |
 | `detect-environment.sh` | Detecta WSL vs Linux nativo |
 | `Makefile` | Atajos para los comandos más frecuentes |
 

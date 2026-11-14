@@ -73,18 +73,33 @@ cd ~/stack_ticket/infra-monitoring
 
 | Comando Make | Equivalente | Acción |
 |---|---|---|
-| `make up` | `bash startup.sh up` | Levanta los 5 stacks de `~/stack_ticket` |
+| `make up` | `bash startup.sh up` | Levanta los 6 stacks de `~/stack_ticket` (`text-to-sql` es opcional: si no está clonado se omite con aviso) |
 | `make down` | `bash startup.sh down` | Los para |
 | `make restart` | `bash startup.sh restart` | Reinicia |
 | `make status` | `bash startup.sh status` | Estado de los contenedores |
 | `make build` | `bash startup.sh build` | Rebuild de imágenes locales + up |
 | `make deploy` | `bash startup.sh deploy` | sync-repos + build + up |
-| `make sync` | `bash sync-repos.sh` | `git pull` de los 5 repos de `~/stack_ticket` |
+| `make sync` | `bash sync-repos.sh` | `git pull` de los 6 repos de `~/stack_ticket` (salta `text-to-sql` si no está clonado) |
 
 `~/stack_agent`: `bash ~/stack_agent/support-console/startup.sh up-all | down-all | status`.
 
 Parar un solo stack: `cd ~/stack_ticket/<repo> && podman-compose down` (nunca `down -v`:
 borra los volúmenes de datos).
+
+### Motor `text-to-sql` (opcional)
+
+Motor de «Preguntas sobre los datos» (repo `jjrm2004mx/text-to-sql`). Sin volumen ni base;
+`ticket-management` lo llama por nombre en `ticket-management-network` (`text-to-sql:8003`) y
+sin él solo las preguntas sobre los datos contestan `503`.
+
+- **Instalar:** `cd ~/stack_ticket && git clone <url> text-to-sql`, `cp .env.example .env` y
+  completar `PROVIDER`, `OCI_*` y `APP_KEY_TICKET_MANAGEMENT` (= `ENGINE_SERVICE_KEY` de
+  `ticket-management`); desde ahí `startup.sh up` lo levanta después de `ticket-ingestion-light`.
+- **Solo el motor:** `cd ~/stack_ticket/text-to-sql && podman-compose up -d --force-recreate`.
+- **Bajarlo:** `startup.sh down` lo baja con el resto; solo él: `podman-compose down` en su directorio.
+- **Quitarlo:** `podman-compose down` en su directorio y borrar el directorio. `startup.sh`,
+  `sync-repos.sh` y los chequeos lo omiten; el objetivo de Prometheus queda en `up == 0`.
+- Runbooks propios en `~/stack_ticket/text-to-sql/docs/runbooks/`.
 
 ---
 
@@ -94,7 +109,7 @@ borra los volúmenes de datos).
 
 ```bash
 bash ~/stack_ticket/infra-monitoring/health-check.sh
-# Al final: "10 / 10 servicios OK" (código de salida 0) o cuáles fallan
+# Al final: "11 / 11 servicios OK" con el motor instalado ("10 / 10" sin él; código 0) o cuáles fallan
 ```
 
 (Se corre con `bash`: el archivo no tiene permiso de ejecución.)
@@ -111,6 +126,7 @@ bash ~/stack_ticket/infra-monitoring/health-check.sh
 | grafana | `http://localhost:3000/api/health` | `"database"` |
 | loki | `http://localhost:3100/ready` | `ready` (reintenta: tarda en arrancar) |
 | ollama | `http://localhost:11434/api/tags` | `"models"` |
+| text-to-sql (solo si `~/stack_ticket/text-to-sql` existe; si no: `[--] no instalado`) | `http://localhost:8003/health` | `"status":"ok"` |
 
 **No cubre** `~/stack_agent` ni las bases de datos directamente. Revisarlos a mano:
 
@@ -126,7 +142,8 @@ podman exec notification-db pg_isready -U notif_admin -d notifications_db
 ### Diagnóstico extendido
 
 `bash ./diagnostico-stack.sh` revisa directorios, `.env`, contenedores, conectividad entre
-servicios, proveedores de IA y redes. `[WARN]` es informativo; `[ERROR]` requiere acción.
+servicios, proveedores de IA y redes (incluye la salud de `text-to-sql` si corre: proveedor,
+modelo y catálogos con su versión). `[WARN]` es informativo; `[ERROR]` requiere acción.
 
 ---
 
@@ -144,7 +161,8 @@ servicios, proveedores de IA y redes. `[WARN]` es informativo; `[ERROR]` requier
 
 **URL:** http://localhost:9090 · targets en http://localhost:9090/targets (todos **UP**).
 Jobs: `ticket-management`, `notification-service`, `langchain-agent`, `langchain-api`,
-`ticket-agent`, `node-exporter`, `prometheus`.
+`ticket-agent`, `text-to-sql`, `node-exporter`, `prometheus` (`text-to-sql` queda DOWN si el
+motor no está instalado; sus series propias empiezan con `tts_`).
 
 ```promql
 up                                                     # 1 = UP, 0 = DOWN, por job
@@ -166,7 +184,10 @@ con `container` (nombre del contenedor) y `service`.
 {container="ticket-system-backend"} |= "ERROR"
 {container="notification-service"} |= "canal"
 {container="til-n8n"}
+{container="text-to-sql"} |= "<requestId>"     # una pregunta: el requestId lo registra ticket-management
 ```
+
+Los logs de `text-to-sql` nunca traen la pregunta, el SQL, filas ni la respuesta.
 
 Sin Grafana: `podman logs --tail 100 <contenedor>`.
 
@@ -183,7 +204,7 @@ podman logs --tail 20 promtail | grep -i "error\|warn"
 ## 8. Sincronizar repos
 
 ```bash
-make sync                    # git pull de los 5 repos de ~/stack_ticket (no toca ~/stack_agent)
+make sync                    # git pull de los 6 repos de ~/stack_ticket (no toca ~/stack_agent)
 ./sync-repos.sh --force      # ⚠️ descarta cambios locales
 cd ~/stack_agent/ticket-agent && git pull     # ~/stack_agent, a mano
 ```
