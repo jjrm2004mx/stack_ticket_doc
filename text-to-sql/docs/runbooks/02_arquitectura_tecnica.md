@@ -1,7 +1,7 @@
 # 02 — Arquitectura técnica
 
-Fuente de verdad: `openspec/` (cambio `motor-inicial` hasta su archivado). Diseño razonado:
-`openspec/changes/motor-inicial/design.md` (D1–D17).
+Fuente de verdad: `openspec/specs/`. Diseño razonado: `openspec/changes/archive/2026-11-14-motor-inicial/design.md`
+(D1–D17).
 
 ## Piezas
 
@@ -71,9 +71,9 @@ Decisiones finas:
 
 | Variable | Defecto | Dónde |
 |---|---|---|
-| `MODEL_TIMEOUT_S` | 20 | Cada llamada al modelo |
-| `SQL_BUDGET_S` | 40 | `/v1/sql` completo (TM espera 45) |
-| `ANSWER_BUDGET_S` | 18 | `/v1/answer` (TM espera 20) |
+| `MODEL_TIMEOUT_S` | 12 | Cada llamada al modelo |
+| `SQL_BUDGET_S` | 26 | `/v1/sql` completo: dos llamadas y la validación (TM espera 30) |
+| `ANSWER_BUDGET_S` | 13 | `/v1/answer`: una llamada (TM espera 15) |
 
 La llamada al adaptador corre en un hilo con `asyncio.wait_for`; al agotarse el tiempo, la respuesta
 sale `503` aunque el hilo termine después.

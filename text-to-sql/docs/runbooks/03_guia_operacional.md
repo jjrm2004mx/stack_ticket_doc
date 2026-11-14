@@ -74,8 +74,8 @@ no está disponible en este momento" (o la tabla sin texto, si falló solo la re
 2. `journalctl -t text-to-sql --since "10 min ago" | grep MODEL_UNAVAILABLE`.
 3. Revisar OCI con el mismo diagnóstico de `ticket-agent` (credenciales en `~/.oci`, compartimento,
    cuota). Si `ticket-agent` tampoco responde, el problema es de OCI y no del motor.
-4. Tiempos: `tts_model_call_seconds` muestra si las llamadas rozan `MODEL_TIMEOUT_S` (20 s). Subirlo
-   exige que siga cabiendo en `SQL_BUDGET_S` y en lo que espera TM (45 s / 20 s).
+4. Tiempos: `tts_model_call_seconds` muestra si las llamadas rozan `MODEL_TIMEOUT_S` (12 s). Subirlo
+   exige que siga cabiendo en `SQL_BUDGET_S` y en lo que espera TM (30 s / 15 s).
 
 El motor no reintenta una llamada fallida: así una caída de OCI no duplica el gasto.
 
