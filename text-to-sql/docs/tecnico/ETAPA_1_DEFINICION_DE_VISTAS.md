@@ -27,7 +27,7 @@
 | Historial de estados | `ticket_status_history`: `from_state_id`, `to_state_id`, `to_category`, `to_outcome`, `changed_at` | `from_status` y `to_status` son la foto del nombre en ese momento y no se usan |
 | Origen | `tickets.channel_id` (no nulo = llegó por un buzón) → `tenant_channels.name` | |
 | Folio | Los primeros 8 caracteres del `id`, en mayúsculas | Así lo forma el portal: `id.slice(0, 8).toUpperCase()` |
-| Personas | `users`: `full_name`, `role` (`USER`, `MANAGER`, `ADMIN`), `status` (`ACTIVE`, `INACTIVE`, `INVITED`, `SYSTEM`) | Los usuarios de sistema son los de `status = 'SYSTEM'` |
+| Personas | `users`: `full_name`, `role` (`USER`, `MANAGER`, `ADMIN`, `CONSULTA`), `status` (`ACTIVE`, `INACTIVE`, `INVITED`, `SYSTEM`) | Los usuarios de sistema son los de `status = 'SYSTEM'` |
 
 ### Hallazgos que cambian el diseño
 
@@ -332,13 +332,14 @@ SELECT u.tenant_id,
        u.role,
        (u.status = 'ACTIVE') AS is_active
 FROM public.users u
-WHERE u.status <> 'SYSTEM';
+WHERE u.status <> 'SYSTEM'
+  AND u.role <> 'CONSULTA';
 ```
 
 - `states.display_order` puede venir vacío: la base lo permite.
 - `areas.is_active` y `categories.is_active` usan `IS TRUE` porque la columna admite vacío.
 - `categories.is_active` es el interruptor de la categoría. No mira si su área está activa.
-- `agents` deja fuera a los usuarios de sistema. Un invitado que aún no acepta sale con `is_active` falso. Es la misma regla con la que TM decide a quién se le puede asignar un ticket. `role` es `USER`, `MANAGER` o `ADMIN`.
+- `agents` deja fuera a los usuarios de sistema y a los de rol `CONSULTA`, que nunca atienden tickets (V74 de TM). Un invitado que aún no acepta sale con `is_active` falso. Es la misma regla con la que TM decide a quién se le puede asignar un ticket. `role` es `USER`, `MANAGER` o `ADMIN`.
 
 ## 4. Columnas de las tablas base que leen las vistas
 
